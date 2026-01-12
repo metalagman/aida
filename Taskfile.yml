@@ -1,0 +1,57 @@
+version: '3'
+
+vars:
+  GOLANGCI_LINT_VERSION: v2.8.0
+
+tasks:
+  default:
+    cmds:
+      - task: build
+
+  build:
+    desc: Build the aida binary
+    cmds:
+      - go build -o bin/aida ./cmd/aida
+    sources:
+      - ./**/*.go
+      - go.mod
+      - go.sum
+    generates:
+      - bin/aida
+
+  install:
+    desc: Install aida to GOPATH/bin
+    cmds:
+      - go install ./cmd/aida
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run --timeout 5m
+
+  lint-install:
+    desc: Install golangci-lint
+    cmds:
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -v -race -coverprofile=coverage.out ./...
+
+  test-coverage:
+    desc: Run tests with coverage report
+    cmds:
+      - go test -v -race -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf bin/
+      - rm -f coverage.out coverage.html
+
+  run:
+    desc: Run aida with args
+    cmds:
+      - go run ./cmd/aida {{.CLI_ARGS}}
