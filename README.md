@@ -1,5 +1,11 @@
 # aida - AI-Powered Shell Assistant
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/metalagman/aida)](https://goreportcard.com/report/github.com/metalagman/aida)
+[![lint](https://github.com/metalagman/aida/actions/workflows/lint.yml/badge.svg)](https://github.com/metalagman/aida/actions/workflows/lint.yml)
+[![test](https://github.com/metalagman/aida/actions/workflows/test.yml/badge.svg)](https://github.com/metalagman/aida/actions/workflows/test.yml)
+[![version](https://img.shields.io/github/v/release/metalagman/aida?sort=semver)](https://github.com/metalagman/aida/releases)
+[![license](https://img.shields.io/github/license/metalagman/aida)](LICENSE)
+
 `aida` translates natural language prompts into shell commands and executes them directly in your terminal.
 
 ## Requirements
