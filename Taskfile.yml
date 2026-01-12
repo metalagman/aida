@@ -3,6 +3,9 @@ version: '3'
 vars:
   GOLANGCI_LINT_VERSION: v2.8.0
 
+env:
+  CGO_ENABLED: 0
+
 tasks:
   default:
     cmds:
@@ -20,6 +23,12 @@ tasks:
       - bin/aida
 
   install:
+    desc: Install aida to /usr/local/bin
+    cmds:
+      - task: build
+      - sudo cp bin/aida /usr/local/bin/aida
+
+  install-go:
     desc: Install aida to GOPATH/bin
     cmds:
       - go install ./cmd/aida
