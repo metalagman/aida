@@ -1,12 +1,11 @@
 # Requirements
 - Project: oneshot runner for LLM-generated shell commands.
 - Default behavior: run commands in `confirm` mode (prompts for confirmation).
-- Execution Modes (`--mode` or `-M`):
-    - `confirm`: Prompt for user confirmation before running (Default).
-    - `yolo`: Standard execution with "Running: ..." output.
-    - `quiet`: Run silently with no output.
-    - `print`: Dry-run; output the command only.
-- Usage example: `aida -M yolo -- find files and change crlf to lf`.
+- Execution Flags:
+    - `--yolo`: Standard execution with "Running: ..." output (no prompt).
+    - `--quiet`: Run silently with no output.
+    - `--dry-run`: Dry-run; output the command only.
+- Usage example: `aida --yolo -- find files and change crlf to lf`.
 - Config location: `~/.config/aida/config.toml` or `~/.config/aida/config.yaml`.
 - Provider config format: TOML `[provider.aistudio]` / YAML `provider: {aistudio: ...}`.
 - Auth: supports multiple providers; currently `aistudio` is implemented.

@@ -135,12 +135,12 @@ func TestRunnerQuietOutputsNothing(t *testing.T) {
 	assert.True(t, exec.called)
 }
 
-func TestRunnerPrintOutputsOnlyCommand(t *testing.T) {
+func TestRunnerDryRunOutputsOnlyCommand(t *testing.T) {
 	var stdout bytes.Buffer
 
 	exec := &fakeExecutor{}
 	r := runner.Runner{
-		Mode:     runner.ModePrint,
+		Mode:     runner.ModeDryRun,
 		Stdout:   &stdout,
 		Stdin:    strings.NewReader(""),
 		Executor: exec,

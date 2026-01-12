@@ -24,22 +24,21 @@ aida providers set-model aistudio gemini-3-flash-preview
 
 ## Usage
 
-Generate and run a command:
+Generate and run a command (defaults to `confirm` mode):
 ```
 aida -- find all files in current directory and change end lines from crlf to lf
 ```
 
-Execution modes (`--mode` or `-M`):
-- `confirm` (default): Prompts for confirmation before running.
-- `yolo`: Prints "Running: ..." and executes the command immediately.
-- `quiet`: Runs the command with no output.
-- `print`: Prints the command but does not execute it.
+Execution modes:
+- `--yolo`: Prints "Running: ..." and executes the command immediately.
+- `--quiet`: Runs the command with no output.
+- `--dry-run`: Prints the command but does not execute it.
 
 Examples:
 ```
-aida -M yolo -- list files
-aida -M quiet -- show git status
-aida -M print -- find large files
+aida --yolo -- list files
+aida --quiet -- show git status
+aida --dry-run -- find large files
 ```
 
 List models for a provider:
@@ -69,7 +68,7 @@ model = "gemini-3-flash"
 
 You can also configure `aida` using environment variables (which take precedence over the config file):
 
-- `AIDA_MODE`: Execution mode (`confirm`, `yolo`, `quiet`, `print`).
+- `AIDA_MODE`: Execution mode (`confirm`, `yolo`, `quiet`, `dry-run`).
 - `AIDA_SHELL`: Shell executable for running commands.
 - `AIDA_DEFAULT_PROVIDER`: The default provider name.
 - `AIDA_PROVIDER_<NAME>_API_KEY`: API key for a specific provider (e.g., `AIDA_PROVIDER_AISTUDIO_API_KEY`).

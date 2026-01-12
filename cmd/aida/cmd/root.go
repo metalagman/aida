@@ -18,7 +18,9 @@ type cliOptions struct {
 	provider string
 	apiKey   string
 	model    string
-	mode     string
+	yolo     bool
+	quiet    bool
+	dryRun   bool
 	shell    string
 }
 
@@ -82,11 +84,14 @@ func NewRootCmd() *cobra.Command {
 func setupRunner(cmd *cobra.Command, opts *cliOptions, cfg *config.Config) runner.Runner {
 	mode := runner.RunMode(cfg.Mode)
 
-	if opts.mode != "" {
-		mode = runner.RunMode(opts.mode)
-	}
-
-	if mode == "" {
+	switch {
+	case opts.dryRun:
+		mode = runner.ModeDryRun
+	case opts.quiet:
+		mode = runner.ModeQuiet
+	case opts.yolo:
+		mode = runner.ModeYOLO
+	case mode == "":
 		mode = runner.ModeConfirm
 	}
 
@@ -106,7 +111,9 @@ func setupFlags(cmd *cobra.Command, opts *cliOptions) {
 	cmd.Flags().StringVar(&opts.apiKey, "api-key", "", "LLM API key")
 	cmd.Flags().StringVar(&opts.model, "model", "", "LLM model name")
 	cmd.Flags().StringVar(&opts.shell, "shell", "", "Shell executable for running commands")
-	cmd.Flags().StringVarP(&opts.mode, "mode", "M", "", "Execution mode (confirm, yolo, quiet, print)")
+	cmd.Flags().BoolVar(&opts.yolo, "yolo", false, "Run without confirmation")
+	cmd.Flags().BoolVar(&opts.quiet, "quiet", false, "Run silently")
+	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Print command without running")
 }
 
 func PromptFromArgs(args []string, dashIndex int) string {

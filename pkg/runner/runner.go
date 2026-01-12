@@ -45,7 +45,7 @@ const (
 	ModeYOLO    RunMode = "yolo"
 	ModeConfirm RunMode = "confirm"
 	ModeQuiet   RunMode = "quiet"
-	ModePrint   RunMode = "print"
+	ModeDryRun  RunMode = "dry-run"
 )
 
 type Runner struct {
@@ -76,7 +76,7 @@ func (r Runner) Run(ctx context.Context, prompt string, provider CommandGenerato
 	}
 
 	switch r.Mode {
-	case ModePrint:
+	case ModeDryRun:
 		_, _ = fmt.Fprintln(r.Stdout, command)
 
 		return nil
