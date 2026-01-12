@@ -31,7 +31,7 @@ aida -- find all files in current directory and change end lines from crlf to lf
 
 Execution modes:
 - `--yolo`: Prints "Running: ..." and executes the command immediately.
-- `--quiet`: Runs the command with no output.
+- `--quiet`: Runs the command and displays only its output (preserves exit code).
 - `--dry-run`: Prints the command but does not execute it.
 
 Examples:

@@ -3,6 +3,7 @@ package runner_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -30,9 +31,13 @@ type fakeExecutor struct {
 	command string
 }
 
-func (e *fakeExecutor) Execute(_ context.Context, command string, _, _ io.Writer, _ io.Reader) error {
+func (e *fakeExecutor) Execute(_ context.Context, command string, stdout, _ io.Writer, _ io.Reader) error {
 	e.called = true
 	e.command = command
+
+	if command == "ls -la" {
+		_, _ = fmt.Fprintln(stdout, "total 0")
+	}
 
 	return nil
 }
@@ -118,7 +123,7 @@ func TestRunnerUnableToRunLocal(t *testing.T) {
 	assert.Contains(t, stdout.String(), "Unable to process the request locally")
 }
 
-func TestRunnerQuietOutputsNothing(t *testing.T) {
+func TestRunnerQuietDisplaysCommandOutput(t *testing.T) {
 	var stdout bytes.Buffer
 
 	exec := &fakeExecutor{}
@@ -131,7 +136,7 @@ func TestRunnerQuietOutputsNothing(t *testing.T) {
 
 	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls -la"})
 	require.NoError(t, err)
-	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "total 0\n", stdout.String())
 	assert.True(t, exec.called)
 }
 

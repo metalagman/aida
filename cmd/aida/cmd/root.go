@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 
@@ -27,7 +28,15 @@ type cliOptions struct {
 var rootCmd = NewRootCmd()
 
 func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+	if err := rootCmd.Execute(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.ExitCode())
+		}
+
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func NewRootCmd() *cobra.Command {
@@ -35,9 +44,11 @@ func NewRootCmd() *cobra.Command {
 
 	opts := &cliOptions{}
 	cmd := &cobra.Command{
-		Use:   "aida [prompt] [-- prompt]",
-		Short: "Generate and run a single shell command from a prompt",
-		Args:  cobra.MinimumNArgs(1),
+		Use:           "aida [prompt] [-- prompt]",
+		Short:         "Generate and run a single shell command from a prompt",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Args:          cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 			defer stop()
