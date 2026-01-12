@@ -1,13 +1,12 @@
-# aida - AI Shell Wrapper
+# aida - AI-Powered Shell Assistant
 
-Oneshot runner for LLM-generated shell commands.
+`aida` translates natural language prompts into shell commands and executes them directly in your terminal.
 
 ## Requirements
 
 - Go 1.25+
-- `golangci-lint` (Taskfile has `lint-install`)
+- `golangci-lint` v2.8.0+ (Taskfile has `lint-install`)
 - Uses Google ADK and `google.golang.org/genai` for model access and listing.
-- Google ADK: https://github.com/google/adk-go
 - Gemini API keys: https://aistudio.google.com/api-keys
 
 ## Setup
