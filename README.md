@@ -14,11 +14,15 @@
 1) Configure a provider:
 ```
 aida providers configure aistudio
+# OR
+aida providers configure openai
 ```
 
 2) Set a model (optional):
 ```
 aida providers set-model aistudio gemini-3-flash-preview
+# OR
+aida providers set-model openai gpt-4o
 ```
 
 ## Usage

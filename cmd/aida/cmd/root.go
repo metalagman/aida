@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"strings"
 
 	"github.com/metalagman/aida/pkg/config"
@@ -118,7 +119,7 @@ func setupRunner(cmd *cobra.Command, opts *cliOptions, cfg *config.Config) runne
 }
 
 func setupFlags(cmd *cobra.Command, opts *cliOptions) {
-	cmd.Flags().StringVar(&opts.provider, "provider", "", "LLM provider (aistudio)")
+	cmd.Flags().StringVar(&opts.provider, "provider", "", "LLM provider (aistudio, openai)")
 	cmd.Flags().StringVar(&opts.apiKey, "api-key", "", "LLM API key")
 	cmd.Flags().StringVar(&opts.model, "model", "", "LLM model name")
 	cmd.Flags().StringVar(&opts.shell, "shell", "", "Shell executable for running commands")
@@ -146,7 +147,19 @@ func formatPromptWithShell(prompt, fallbackShell string) string {
 		shell = "/bin/sh"
 	}
 
-	return fmt.Sprintf("Shell: %s\nRequest: %s", shell, prompt)
+	wd, err := os.Getwd()
+	if err != nil {
+		wd = ""
+	}
+
+	return fmt.Sprintf(
+		"OS: %s\nArch: %s\nPWD: %s\nShell: %s\nRequest: %s",
+		runtime.GOOS,
+		runtime.GOARCH,
+		wd,
+		shell,
+		prompt,
+	)
 }
 
 func applyOverrides(cfg *config.Config, opts *cliOptions) {

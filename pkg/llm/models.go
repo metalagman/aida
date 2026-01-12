@@ -35,6 +35,8 @@ func ListModels(ctx context.Context, provider string, cfg config.ProviderConfig)
 		}
 
 		return listGenAIModels(ctx, client)
+	case "openai":
+		return listOpenAIModels(ctx, cfg.APIKey)
 	default:
 		return nil, fmt.Errorf("unsupported provider %q", provider)
 	}

@@ -28,6 +28,12 @@ func NewProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
 		}
 
 		return NewGoogleADKProvider(ctx, active.APIKey, active.Model)
+	case "openai":
+		if active.APIKey == "" {
+			return nil, errors.New("api_key is required for openai provider")
+		}
+
+		return NewOpenAIProvider(active.APIKey, active.Model)
 	default:
 		return nil, fmt.Errorf("unsupported llm provider %q", name)
 	}

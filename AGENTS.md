@@ -8,7 +8,7 @@
 - Usage example: `aida --yolo -- find files and change crlf to lf`.
 - Config location: `~/.config/aida/config.toml` or `~/.config/aida/config.yaml`.
 - Provider config format: TOML `[provider.aistudio]` / YAML `provider: {aistudio: ...}`.
-- Auth: supports multiple providers; currently `aistudio` is implemented.
+- Auth: supports multiple providers; currently `aistudio` and `openai` are implemented.
 - Model list: `aida providers models [provider]` (use `--all` to show all).
 - Provider configuration: `aida providers configure <provider> [--api-key ... --model ...]`.
 - Provider model set: `aida providers set-model <provider> <model>`.

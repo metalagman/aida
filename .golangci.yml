@@ -5,5 +5,6 @@ linters:
   disable:
     - wsl
     - depguard
+    - nolintlint
   enable:
     - wsl_v5

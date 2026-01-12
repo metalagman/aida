@@ -25,8 +25,53 @@ func newProvidersCmd() *cobra.Command {
 	cmd.AddCommand(newProvidersModelsCmd())
 	cmd.AddCommand(newProvidersSetModelCmd())
 	cmd.AddCommand(newProvidersConfigureCmd())
+	cmd.AddCommand(newProvidersDefaultCmd())
 
 	return cmd
+}
+
+func newProvidersDefaultCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "default [provider]",
+		Short: "Get or set the default provider",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+
+			if len(args) == 0 {
+				if cfg.DefaultProvider == "" {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No default provider set.")
+				} else {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), cfg.DefaultProvider)
+				}
+
+				return nil
+			}
+
+			name := normalizeProvider(args[0])
+			if name == "" {
+				return fmt.Errorf("unsupported provider %q", args[0])
+			}
+
+			if _, ok := cfg.FindProvider(name); !ok {
+				return fmt.Errorf("provider %q not configured", name)
+			}
+
+			cfg.DefaultProvider = name
+
+			path, err := config.Save(cfg)
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Set default provider to %s in %s\n", name, path)
+
+			return nil
+		},
+	}
 }
 
 func newProvidersListCmd() *cobra.Command {
@@ -110,6 +155,7 @@ func newProvidersModelsCmd() *cobra.Command {
 	}
 
 	cmd.Flags().Bool("all", false, "Show all models, not just generateContent-capable ones")
+	cmd.Flags().String("api-key", "", "API key to use for listing models")
 
 	return cmd
 }
@@ -123,9 +169,15 @@ func runProvidersModels(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	providerName, provider, err := resolveProviderAndConfig(cfg, args)
+	apiKey, _ := cmd.Flags().GetString("api-key")
+
+	providerName, provider, err := resolveProviderForModels(cfg, args)
 	if err != nil {
 		return err
+	}
+
+	if apiKey != "" {
+		provider.APIKey = apiKey
 	}
 
 	all, _ := cmd.Flags().GetBool("all")
@@ -152,40 +204,44 @@ func runProvidersModels(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func resolveProviderAndConfig(cfg *config.Config, args []string) (string, config.ProviderConfig, error) {
+func resolveProviderForModels(cfg *config.Config, args []string) (string, config.ProviderConfig, error) {
 	if len(args) == 0 {
 		return cfg.ActiveProvider()
 	}
 
-	name := normalizeProvider(args[0])
-	if name == "" {
+	providerName := normalizeProvider(args[0])
+	if providerName == "" {
 		return "", config.ProviderConfig{}, fmt.Errorf("unsupported provider %q", args[0])
 	}
 
-	provider, ok := cfg.FindProvider(name)
-	if !ok {
-		return "", config.ProviderConfig{}, fmt.Errorf("provider %q not configured", name)
-	}
+	provider, _ := cfg.FindProvider(providerName)
 
-	return name, provider, nil
+	return providerName, provider, nil
 }
 
-const setModelArgsCount = 2
-
 func newProvidersSetModelCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "set-model <provider> <model>",
+	const minArgs = 1
+
+	const maxArgs = 2
+
+	cmd := &cobra.Command{
+		Use:   "set-model <provider> [model]",
 		Short: "Set the default model for a provider",
-		Args:  cobra.ExactArgs(setModelArgsCount),
+		Args:  cobra.RangeArgs(minArgs, maxArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := normalizeProvider(args[0])
 			if name == "" {
 				return fmt.Errorf("unsupported provider %q", args[0])
 			}
 
-			model := strings.TrimSpace(args[1])
+			model, _ := cmd.Flags().GetString("model")
+			if len(args) > 1 {
+				model = args[1]
+			}
+
+			model = strings.TrimSpace(model)
 			if model == "" {
-				return fmt.Errorf("model is required")
+				return fmt.Errorf("model is required (either as an argument or via --model flag)")
 			}
 
 			cfg, err := config.Load()
@@ -211,6 +267,10 @@ func newProvidersSetModelCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().String("model", "", "Model to set (can also be provided as a second argument)")
+
+	return cmd
 }
 
 func newProvidersConfigureCmd() *cobra.Command {
@@ -239,7 +299,7 @@ func runProvidersConfigure(cmd *cobra.Command, args []string) error {
 	if apiKey == "" {
 		var err error
 
-		apiKey, err = promptForAPIKey(cmd)
+		apiKey, err = promptForAPIKey(cmd, name)
 		if err != nil {
 			return err
 		}
@@ -278,9 +338,12 @@ func runProvidersConfigure(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func promptForAPIKey(cmd *cobra.Command) (string, error) {
+func promptForAPIKey(cmd *cobra.Command, provider string) (string, error) {
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintln(out, "Create an API key at: https://aistudio.google.com/api-keys")
+	if hint := apiKeyHint(provider); hint != "" {
+		_, _ = fmt.Fprintf(out, "Create an API key at: %s\n", hint)
+	}
+
 	_, _ = fmt.Fprint(out, "Enter API key: ")
 
 	reader := bufio.NewReader(cmd.InOrStdin())
@@ -291,6 +354,17 @@ func promptForAPIKey(cmd *cobra.Command) (string, error) {
 	}
 
 	return strings.TrimSpace(key), nil
+}
+
+func apiKeyHint(provider string) string {
+	switch normalizeProvider(provider) {
+	case "aistudio":
+		return "https://aistudio.google.com/api-keys"
+	case "openai":
+		return "https://platform.openai.com/api-keys"
+	default:
+		return ""
+	}
 }
 
 func promptForModel(cmd *cobra.Command, provider string) (string, error) {

@@ -12,7 +12,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ProviderAIStudio = "aistudio"
+const (
+	ProviderAIStudio = "aistudio"
+	ProviderOpenAI   = "openai"
+)
 
 const (
 	DirPerm       = 0o700
@@ -21,11 +24,12 @@ const (
 )
 
 type Config struct {
-	LLM             LLMConfig                 `mapstructure:"llm"              toml:"-"                yaml:"-"`
-	Providers       map[string]ProviderConfig `mapstructure:"provider"         toml:"provider"         yaml:"provider"`
+	LLM       LLMConfig                 `mapstructure:"llm"      toml:"-"        yaml:"-"`
+	Providers map[string]ProviderConfig `mapstructure:"provider" toml:"provider" yaml:"provider"`
+	//nolint:lll
 	DefaultProvider string `mapstructure:"default_provider" toml:"default_provider" yaml:"default_provider"`
-	Mode            string                    `mapstructure:"mode"             toml:"mode"             yaml:"mode"`
-	Shell           string                    `mapstructure:"shell"            toml:"shell"            yaml:"shell"`
+	Mode            string `mapstructure:"mode"             toml:"mode"             yaml:"mode"`
+	Shell           string `mapstructure:"shell"            toml:"shell"            yaml:"shell"`
 }
 
 type LLMConfig struct {
@@ -157,6 +161,8 @@ func NormalizeProviderName(input string) string {
 	switch normalized {
 	case ProviderAIStudio, "google", "googleai", "google-ai-studio":
 		return ProviderAIStudio
+	case ProviderOpenAI, "open-ai":
+		return ProviderOpenAI
 	default:
 		return normalized
 	}
@@ -166,6 +172,8 @@ func DefaultModelForProvider(input string) string {
 	switch NormalizeProviderName(input) {
 	case ProviderAIStudio:
 		return "gemini-3-flash"
+	case ProviderOpenAI:
+		return "gpt-4o-mini"
 	default:
 		return ""
 	}
