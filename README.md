@@ -18,11 +18,16 @@ aida providers configure aistudio
 aida providers configure openai
 ```
 
-2) Set a model (optional):
+2) Set the default provider (optional):
+```
+aida providers default openai
+```
+
+3) Set a model (optional):
 ```
 aida providers set-model aistudio gemini-3-flash-preview
 # OR
-aida providers set-model openai gpt-4o
+aida providers set-model openai --model gpt-4o
 ```
 
 ## Usage
@@ -47,7 +52,8 @@ aida --dry-run -- find large files
 List models for a provider:
 ```
 aida providers models aistudio
-aida providers models aistudio --all
+aida providers models openai --all
+aida providers models openai --api-key YOUR_KEY
 ```
 
 ## Config
@@ -58,13 +64,17 @@ Config lives at:
 
 Example `config.toml`:
 ```
-default_provider = "aistudio"
+default_provider = "openai"
 mode = "confirm"
 shell = "/bin/sh"
 
 [provider.aistudio]
-api_key = "YOUR_KEY"
+api_key = "YOUR_GEMINI_KEY"
 model = "gemini-3-flash"
+
+[provider.openai]
+api_key = "YOUR_OPENAI_KEY"
+model = "gpt-4o"
 ```
 
 ### Environment Variables
