@@ -46,7 +46,7 @@ tasks:
   test:
     desc: Run tests
     cmds:
-      - go test -v -race -coverprofile=coverage.out ./...
+      - CGO_ENABLED=1 go test -v -race -coverprofile=coverage.out ./...
 
   test-coverage:
     desc: Run tests with coverage report

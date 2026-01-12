@@ -90,13 +90,13 @@ func (r Runner) Run(ctx context.Context, prompt string, provider CommandGenerato
 }
 
 func (r Runner) runWithConfirmation(ctx context.Context, command string, forceConfirm bool) error {
-	_, _ = fmt.Fprintf(r.Stdout, "Running: %s\n", command)
-
 	if forceConfirm {
 		if err := r.confirm(command); err != nil {
 			return err
 		}
 	}
+
+	_, _ = fmt.Fprintf(r.Stdout, "Running: %s\n", command)
 
 	return r.Executor.Execute(ctx, command, r.Stdout, r.Stderr, r.Stdin)
 }
