@@ -15,6 +15,7 @@ func TestNormalizeProviderName(t *testing.T) {
 		{input: "OpenAI", want: "openai"},
 		{input: "open-ai", want: "openai"},
 		{input: "google-ai-studio", want: "aistudio"},
+		{input: "unknown", want: ""},
 	}
 
 	for _, test := range tests {

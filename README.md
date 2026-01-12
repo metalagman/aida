@@ -11,9 +11,10 @@
 ## Requirements
 
 - Go 1.25+
-- `golangci-lint` v2.8.0+ (Taskfile has `lint-install`)
+- `golangci-lint` v2.8.0+ (Taskfile has `lint:install`)
 - Uses Google ADK and `google.golang.org/genai` for model access and listing.
 - Gemini API keys: https://aistudio.google.com/api-keys
+- OpenAI API keys: https://platform.openai.com/api-keys
 
 ## Setup
 
@@ -92,8 +93,6 @@ You can also configure `aida` using environment variables (which take precedence
 - `AIDA_DEFAULT_PROVIDER`: The default provider name.
 - `AIDA_PROVIDER_<NAME>_API_KEY`: API key for a specific provider (e.g., `AIDA_PROVIDER_AISTUDIO_API_KEY`).
 - `AIDA_PROVIDER_<NAME>_MODEL`: Model for a specific provider (e.g., `AIDA_PROVIDER_AISTUDIO_MODEL`).
-- `AIDA_LLM_API_KEY`: API key for the currently active provider.
-- `AIDA_LLM_MODEL`: Model name for the currently active provider.
 
 ## Development
 

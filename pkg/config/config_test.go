@@ -78,7 +78,7 @@ func TestLoad_Defaults(t *testing.T) {
 	_ = setupTestHome(t)
 	cfg, err := config.Load()
 	require.NoError(t, err)
-	assert.Equal(t, "aistudio", cfg.DefaultProvider)
+	assert.Empty(t, cfg.DefaultProvider)
 	assert.Empty(t, cfg.Providers)
 	assert.Equal(t, "confirm", cfg.Mode)
 	assert.Equal(t, "/bin/sh", cfg.Shell)
@@ -90,26 +90,13 @@ func TestLoad_EnvVars(t *testing.T) {
 
 	t.Cleanup(func() {
 		os.Setenv("HOME", origHome)
-		os.Unsetenv("AIDA_LLM_PROVIDER")
-		os.Unsetenv("AIDA_LLM_API_KEY")
-		os.Unsetenv("AIDA_LLM_MODEL")
 		os.Unsetenv("AIDA_MODE")
 	})
 	os.Setenv("HOME", tmpDir)
-	os.Setenv("AIDA_LLM_PROVIDER", "google")
-	os.Setenv("AIDA_LLM_API_KEY", "env-key")
-	os.Setenv("AIDA_LLM_MODEL", "gemini-pro")
 	os.Setenv("AIDA_MODE", "quiet")
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
-	require.Equal(t, "aistudio", cfg.DefaultProvider)
-	require.Len(t, cfg.Providers, 1)
-
-	provider, ok := cfg.Providers["aistudio"]
-	require.True(t, ok)
-	assert.Equal(t, "env-key", provider.APIKey)
-	assert.Equal(t, "gemini-pro", provider.Model)
 	assert.Equal(t, "quiet", cfg.Mode)
 	assert.Equal(t, "/bin/sh", cfg.Shell)
 }

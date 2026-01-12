@@ -24,18 +24,11 @@ const (
 )
 
 type Config struct {
-	LLM       LLMConfig                 `mapstructure:"llm"      toml:"-"        yaml:"-"`
 	Providers map[string]ProviderConfig `mapstructure:"provider" toml:"provider" yaml:"provider"`
 	//nolint:lll
 	DefaultProvider string `mapstructure:"default_provider" toml:"default_provider" yaml:"default_provider"`
 	Mode            string `mapstructure:"mode"             toml:"mode"             yaml:"mode"`
 	Shell           string `mapstructure:"shell"            toml:"shell"            yaml:"shell"`
-}
-
-type LLMConfig struct {
-	Provider string `mapstructure:"provider" toml:"-" yaml:"-"`
-	APIKey   string `mapstructure:"api_key"  toml:"-" yaml:"-"`
-	Model    string `mapstructure:"model"    toml:"-" yaml:"-"`
 }
 
 type ProviderConfig struct {
@@ -61,9 +54,6 @@ func Load() (*Config, error) {
 	v.AutomaticEnv()
 
 	// Bind keys so Viper knows to look for them in environment variables
-	_ = v.BindEnv("llm.provider")
-	_ = v.BindEnv("llm.api_key")
-	_ = v.BindEnv("llm.model")
 	_ = v.BindEnv("mode")
 	_ = v.BindEnv("shell")
 	_ = v.BindEnv("default_provider")
@@ -84,15 +74,10 @@ func Load() (*Config, error) {
 	}
 
 	applyEnvOverrides(&cfg)
-	migrateLegacyLLM(&cfg)
 	normalizeProviders(&cfg)
 
 	if cfg.DefaultProvider == "" && len(cfg.Providers) > 0 {
 		cfg.DefaultProvider = FirstProviderName(cfg.Providers)
-	}
-
-	if cfg.DefaultProvider == "" {
-		cfg.DefaultProvider = ProviderAIStudio
 	}
 
 	return &cfg, nil
@@ -164,7 +149,7 @@ func NormalizeProviderName(input string) string {
 	case ProviderOpenAI, "open-ai":
 		return ProviderOpenAI
 	default:
-		return normalized
+		return ""
 	}
 }
 
@@ -335,38 +320,6 @@ func normalizeSingleProvider(normalized map[string]ProviderConfig, name string, 
 	}
 }
 
-func migrateLegacyLLM(cfg *Config) {
-	if cfg == nil {
-		return
-	}
-
-	if len(cfg.Providers) > 0 {
-		return
-	}
-
-	if cfg.LLM.Provider == "" && cfg.LLM.APIKey == "" && cfg.LLM.Model == "" {
-		return
-	}
-
-	name := NormalizeProviderName(cfg.LLM.Provider)
-	if name == "" {
-		name = ProviderAIStudio
-	}
-
-	if cfg.Providers == nil {
-		cfg.Providers = make(map[string]ProviderConfig)
-	}
-
-	cfg.Providers[name] = ProviderConfig{
-		APIKey: cfg.LLM.APIKey,
-		Model:  cfg.LLM.Model,
-	}
-
-	if cfg.DefaultProvider == "" {
-		cfg.DefaultProvider = name
-	}
-}
-
 func applyEnvOverrides(cfg *Config) {
 	if cfg == nil {
 		return
@@ -379,33 +332,6 @@ func applyEnvOverrides(cfg *Config) {
 	if cfg.DefaultProvider == "" {
 		// Viper should have already handled AIDA_DEFAULT_PROVIDER via BindEnv
 		// But if it's still empty, we fallback to our logic.
-	}
-
-	// 3. Generic active provider overrides (AIDA_LLM_API_KEY / AIDA_LLM_MODEL)
-	envProvider := NormalizeProviderName(cfg.LLM.Provider)
-	if envProvider != "" {
-		cfg.DefaultProvider = envProvider
-	}
-
-	apiKey := cfg.LLM.APIKey
-	model := cfg.LLM.Model
-
-	if envProvider == "" && (apiKey != "" || model != "") {
-		if cfg.DefaultProvider != "" {
-			envProvider = cfg.DefaultProvider
-		} else if len(cfg.Providers) > 0 {
-			envProvider = FirstProviderName(cfg.Providers)
-		} else {
-			envProvider = ProviderAIStudio
-			cfg.DefaultProvider = envProvider
-		}
-	}
-
-	if envProvider != "" {
-		cfg.UpsertProvider(envProvider, ProviderConfig{
-			APIKey: apiKey,
-			Model:  model,
-		})
 	}
 
 	cfg.DefaultProvider = NormalizeProviderName(cfg.DefaultProvider)
