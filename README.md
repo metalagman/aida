@@ -34,7 +34,7 @@ aida providers default openai
 ```
 aida providers set-model aistudio gemini-2.5-flash
 # OR
-aida providers set-model openai --model gpt-4o
+aida providers set-model openai gpt-4o-mini
 ```
 
 ## Usage
@@ -81,7 +81,7 @@ model = "gemini-2.5-flash"
 
 [provider.openai]
 api_key = "YOUR_OPENAI_KEY"
-model = "gpt-4o"
+model = "gpt-4o-mini"
 ```
 
 ### Environment Variables
