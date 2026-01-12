@@ -52,8 +52,8 @@ func TestRunnerConfirmYes(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, exec.called)
 	assert.Equal(t, "ls -la", exec.command)
-	assert.Contains(t, stdout.String(), `I would run "ls -la", confirm?`)
-	assert.Contains(t, stdout.String(), "Running: ls -la")
+	assert.Contains(t, stdout.String(), "I would run \x1b[36m`ls -la`\x1b[0m")
+	assert.Contains(t, stdout.String(), "Running: \x1b[36m`ls -la`\x1b[0m")
 }
 
 func TestRunnerConfirmNo(t *testing.T) {

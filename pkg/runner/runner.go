@@ -89,6 +89,11 @@ func (r Runner) Run(ctx context.Context, prompt string, provider CommandGenerato
 	}
 }
 
+const (
+	colorReset = "\033[0m"
+	colorCyan  = "\033[36m"
+)
+
 func (r Runner) runWithConfirmation(ctx context.Context, command string, forceConfirm bool) error {
 	if forceConfirm {
 		if err := r.confirm(command); err != nil {
@@ -96,13 +101,13 @@ func (r Runner) runWithConfirmation(ctx context.Context, command string, forceCo
 		}
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "Running: %s\n", command)
+	_, _ = fmt.Fprintf(r.Stdout, "Running: %s`%s`%s\n", colorCyan, command, colorReset)
 
 	return r.Executor.Execute(ctx, command, r.Stdout, r.Stderr, r.Stdin)
 }
 
 func (r Runner) confirm(command string) error {
-	_, _ = fmt.Fprintf(r.Stdout, "I would run %q, confirm? [y/N] ", command)
+	_, _ = fmt.Fprintf(r.Stdout, "I would run %s`%s`%s, confirm? [y/N] ", colorCyan, command, colorReset)
 
 	reader := bufio.NewReader(r.Stdin)
 
