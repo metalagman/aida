@@ -31,7 +31,7 @@ func TestDefaultModelForProvider(t *testing.T) {
 		want  string
 	}{
 		{input: "openai", want: "gpt-4o-mini"},
-		{input: "aistudio", want: "gemini-3-flash"},
+		{input: "aistudio", want: "gemini-2.5-flash"},
 		{input: "unknown", want: ""},
 	}
 

@@ -156,7 +156,7 @@ func NormalizeProviderName(input string) string {
 func DefaultModelForProvider(input string) string {
 	switch NormalizeProviderName(input) {
 	case ProviderAIStudio:
-		return "gemini-3-flash"
+		return "gemini-2.5-flash"
 	case ProviderOpenAI:
 		return "gpt-4o-mini"
 	default:

@@ -32,7 +32,7 @@ aida providers default openai
 
 3) Set a model (optional):
 ```
-aida providers set-model aistudio gemini-3-flash-preview
+aida providers set-model aistudio gemini-2.5-flash
 # OR
 aida providers set-model openai --model gpt-4o
 ```
@@ -77,7 +77,7 @@ shell = "/bin/sh"
 
 [provider.aistudio]
 api_key = "YOUR_GEMINI_KEY"
-model = "gemini-3-flash"
+model = "gemini-2.5-flash"
 
 [provider.openai]
 api_key = "YOUR_OPENAI_KEY"

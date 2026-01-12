@@ -178,7 +178,7 @@ func TestUpsertProvider_DefaultModel(t *testing.T) {
 
 	provider, ok := cfg.Providers["aistudio"]
 	require.True(t, ok)
-	assert.Equal(t, "gemini-3-flash", provider.Model)
+	assert.Equal(t, "gemini-2.5-flash", provider.Model)
 }
 
 func TestSave_OverwriteYAML(t *testing.T) {
