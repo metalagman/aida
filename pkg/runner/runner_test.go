@@ -49,11 +49,16 @@ func TestRunnerConfirmYes(t *testing.T) {
 	}
 
 	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls -la"})
+
 	require.NoError(t, err)
+
 	assert.True(t, exec.called)
+
 	assert.Equal(t, "ls -la", exec.command)
+
 	assert.Contains(t, stdout.String(), "I would run \x1b[36m`ls -la`\x1b[0m")
-	assert.Contains(t, stdout.String(), "Running: \x1b[36m`ls -la`\x1b[0m")
+
+	assert.NotContains(t, stdout.String(), "Running:")
 }
 
 func TestRunnerConfirmNo(t *testing.T) {
@@ -87,7 +92,7 @@ func TestRunnerYOLO(t *testing.T) {
 	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls"})
 	require.NoError(t, err)
 	assert.True(t, exec.called)
-	assert.NotContains(t, stdout.String(), "confirm?")
+	assert.Contains(t, stdout.String(), "Running: \x1b[36m`ls`\x1b[0m")
 }
 
 func TestRunnerEmptyCommand(t *testing.T) {

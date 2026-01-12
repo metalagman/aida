@@ -99,9 +99,9 @@ func (r Runner) runWithConfirmation(ctx context.Context, command string, forceCo
 		if err := r.confirm(command); err != nil {
 			return err
 		}
+	} else {
+		_, _ = fmt.Fprintf(r.Stdout, "Running: %s`%s`%s\n", colorCyan, command, colorReset)
 	}
-
-	_, _ = fmt.Fprintf(r.Stdout, "Running: %s`%s`%s\n", colorCyan, command, colorReset)
 
 	return r.Executor.Execute(ctx, command, r.Stdout, r.Stderr, r.Stdin)
 }
