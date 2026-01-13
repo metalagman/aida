@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/metalagman/aida/pkg/llm/command"
+	"github.com/metalagman/aida/internal/llm/command"
 	"google.golang.org/adk/model"
 	"google.golang.org/adk/model/gemini"
 	"google.golang.org/genai"

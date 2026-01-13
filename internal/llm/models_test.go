@@ -3,7 +3,7 @@ package llm_test
 import (
 	"testing"
 
-	"github.com/metalagman/aida/pkg/llm"
+	"github.com/metalagman/aida/internal/llm"
 )
 
 func TestFilterModelsForGenerateContent(t *testing.T) {

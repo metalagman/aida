@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/metalagman/aida/pkg/llm/command"
+	"github.com/metalagman/aida/internal/llm/command"
 	"google.golang.org/adk/model"
 )
 

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/metalagman/aida/pkg/config"
-	"github.com/metalagman/aida/pkg/llm/provider"
-	"github.com/metalagman/aida/pkg/llm/providers/aistudio"
-	"github.com/metalagman/aida/pkg/llm/providers/openai"
+	"github.com/metalagman/aida/internal/config"
+	"github.com/metalagman/aida/internal/llm/provider"
+	"github.com/metalagman/aida/internal/llm/providers/aistudio"
+	"github.com/metalagman/aida/internal/llm/providers/openai"
 )
 
 type Provider = provider.Provider

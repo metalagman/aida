@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/metalagman/aida/pkg/runner"
+	"github.com/metalagman/aida/internal/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -21,8 +21,7 @@
 - Development: always write code as a senior Go developer.
 - Go style: follow Go Google style decisions, Go Google best practices, and the Go Google style guide.
 - Commits: follow Conventional Commits.
-- Planning: create a plan before starting work.
-- New features: update AGENTS.md before implementation.
+- Packaging: use `internal/` for non-exported code; only public APIs stay outside `internal/`.
 
 ## Development workflow
 1. Plan the work.

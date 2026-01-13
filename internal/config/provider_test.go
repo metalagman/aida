@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/metalagman/aida/pkg/config"
+	"github.com/metalagman/aida/internal/config"
 )
 
 func TestNormalizeProviderName(t *testing.T) {

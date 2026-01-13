@@ -3,7 +3,7 @@ package command_test
 import (
 	"testing"
 
-	"github.com/metalagman/aida/pkg/llm/command"
+	"github.com/metalagman/aida/internal/llm/command"
 )
 
 func TestSanitizeCommand(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/metalagman/aida/pkg/llm/providers/openai"
+	"github.com/metalagman/aida/internal/llm/providers/openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	adkmodel "google.golang.org/adk/model"

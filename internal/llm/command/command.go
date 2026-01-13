@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metalagman/aida/pkg/llm/templater"
+	"github.com/metalagman/aida/internal/llm/templater"
 	"google.golang.org/adk/model"
 	"google.golang.org/genai"
 )

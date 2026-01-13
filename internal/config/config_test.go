@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/metalagman/aida/pkg/config"
+	"github.com/metalagman/aida/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

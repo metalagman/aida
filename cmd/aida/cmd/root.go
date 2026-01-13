@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/metalagman/aida/pkg/config"
-	"github.com/metalagman/aida/pkg/llm"
-	"github.com/metalagman/aida/pkg/runner"
+	"github.com/metalagman/aida/internal/config"
+	"github.com/metalagman/aida/internal/llm"
+	"github.com/metalagman/aida/internal/runner"
 	"github.com/spf13/cobra"
 )
 

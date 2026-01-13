@@ -3,7 +3,7 @@ package templater_test
 import (
 	"testing"
 
-	"github.com/metalagman/aida/pkg/llm/templater"
+	"github.com/metalagman/aida/internal/llm/templater"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

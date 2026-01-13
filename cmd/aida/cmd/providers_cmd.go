@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metalagman/aida/pkg/config"
-	"github.com/metalagman/aida/pkg/llm"
+	"github.com/metalagman/aida/internal/config"
+	"github.com/metalagman/aida/internal/llm"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
