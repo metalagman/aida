@@ -59,7 +59,9 @@ func NewRootCmd() *cobra.Command {
 				return loadErr
 			}
 
-			applyOverrides(cfg, opts)
+			if err := applyOverrides(cfg, opts); err != nil {
+				return err
+			}
 
 			provider, err := llm.NewProvider(ctx, cfg)
 			if err != nil {
@@ -137,12 +139,7 @@ func PromptFromArgs(args []string, dashIndex int) string {
 }
 
 func formatPromptWithShell(prompt, fallbackShell string) string {
-	shell := os.Getenv("SHELL")
-
-	if shell == "" {
-		shell = fallbackShell
-	}
-
+	shell := fallbackShell
 	if shell == "" {
 		shell = "/bin/sh"
 	}
@@ -162,9 +159,18 @@ func formatPromptWithShell(prompt, fallbackShell string) string {
 	)
 }
 
-func applyOverrides(cfg *config.Config, opts *cliOptions) {
+func applyOverrides(cfg *config.Config, opts *cliOptions) error {
 	if opts == nil || cfg == nil {
-		return
+		return nil
+	}
+
+	if opts.provider != "" {
+		normalized := normalizeProvider(opts.provider)
+		if normalized == "" {
+			return fmt.Errorf("unsupported provider %q", opts.provider)
+		}
+
+		cfg.DefaultProvider = normalized
 	}
 
 	if opts.shell != "" {
@@ -175,6 +181,8 @@ func applyOverrides(cfg *config.Config, opts *cliOptions) {
 		cfg.Shell = "/bin/sh"
 	}
 
+	_ = os.Setenv("AIDA_SHELL", cfg.Shell)
+
 	providerName := resolveProviderName(cfg, opts)
 
 	if providerName != "" && (opts.apiKey != "" || opts.model != "") {
@@ -183,6 +191,8 @@ func applyOverrides(cfg *config.Config, opts *cliOptions) {
 			Model:  opts.model,
 		})
 	}
+
+	return nil
 }
 
 func resolveProviderName(cfg *config.Config, opts *cliOptions) string {

@@ -6,13 +6,16 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/metalagman/aida/pkg/llm/templater"
 	"google.golang.org/adk/model"
 	"google.golang.org/genai"
 )
 
-const systemInstructionTemplate = `You are a shell command generator. Output ONLY the raw shell command, no markdown fences, no explanation. If you cannot fulfill the request, output UNABLE_TO_RUN_LOCAL.
+const systemInstructionTemplate = `You are a shell command generator. Output ONLY the raw shell command,
+no markdown fences, no explanation. If you cannot fulfill the request,
+output UNABLE_TO_RUN_LOCAL.
 
 Environment:
 - OS: {{.OS}}
@@ -20,15 +23,24 @@ Environment:
 - Shell: {{.Shell}}
 - CWD: {{.CWD}}`
 
+const defaultGenerateTimeout = 60 * time.Second
+
 func GenerateCommandWithModel(ctx context.Context, llmModel model.LLM, prompt string) (string, error) {
 	if llmModel == nil {
 		return "", fmt.Errorf("model is required")
 	}
 
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+
+		ctx, cancel = context.WithTimeout(ctx, defaultGenerateTimeout)
+		defer cancel()
+	}
+
 	systemInstruction, err := templater.Render(systemInstructionTemplate, map[string]string{
 		"OS":    runtime.GOOS,
 		"Arch":  runtime.GOARCH,
-		"Shell": defaultString(os.Getenv("SHELL"), "unknown"),
+		"Shell": defaultString(os.Getenv("AIDA_SHELL"), os.Getenv("SHELL"), "unknown"),
 		"CWD":   defaultString(currentDir(), "unknown"),
 	})
 	if err != nil {
@@ -84,10 +96,12 @@ func currentDir() string {
 	return dir
 }
 
-func defaultString(value string, fallback string) string {
-	if strings.TrimSpace(value) == "" {
-		return fallback
+func defaultString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
 	}
 
-	return value
+	return ""
 }

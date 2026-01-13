@@ -132,3 +132,33 @@ func TestProvidersConfigure(t *testing.T) {
 	require.Equal(t, "test-key", provider.APIKey)
 	require.Equal(t, "gemini-3-flash-preview", provider.Model)
 }
+
+func TestProvidersConfigureEOFInputUsesDefaultModel(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+
+	t.Cleanup(func() {
+		os.Setenv("HOME", origHome)
+	})
+	os.Setenv("HOME", tmpDir)
+
+	var out bytes.Buffer
+
+	root := cmd.NewRootCmd()
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetIn(strings.NewReader("test-key"))
+	root.SetArgs([]string{"providers", "configure", "aistudio"})
+
+	err := root.Execute()
+	require.NoError(t, err)
+	require.Contains(t, out.String(), "Configured aistudio")
+
+	loaded, err := config.Load()
+	require.NoError(t, err)
+
+	provider, ok := loaded.FindProvider("aistudio")
+	require.True(t, ok)
+	require.Equal(t, "test-key", provider.APIKey)
+	require.Equal(t, "gemini-2.5-flash", provider.Model)
+}

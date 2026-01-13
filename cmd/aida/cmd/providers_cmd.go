@@ -3,16 +3,22 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/metalagman/aida/pkg/config"
 	"github.com/metalagman/aida/pkg/llm"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
+
+const modelListTimeout = 30 * time.Second
 
 func newProvidersCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -163,6 +169,9 @@ func newProvidersModelsCmd() *cobra.Command {
 func runProvidersModels(cmd *cobra.Command, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	ctx, cancel := context.WithTimeout(ctx, modelListTimeout)
+	defer cancel()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -346,9 +355,20 @@ func promptForAPIKey(cmd *cobra.Command, provider string) (string, error) {
 
 	_, _ = fmt.Fprint(out, "Enter API key: ")
 
+	if file, ok := cmd.InOrStdin().(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+		key, err := term.ReadPassword(int(file.Fd()))
+		if err != nil {
+			return "", fmt.Errorf("read API key: %w", err)
+		}
+
+		_, _ = fmt.Fprintln(out)
+
+		return strings.TrimSpace(string(key)), nil
+	}
+
 	reader := bufio.NewReader(cmd.InOrStdin())
 
-	key, err := reader.ReadString('\n')
+	key, err := readLine(reader)
 	if err != nil {
 		return "", fmt.Errorf("read API key: %w", err)
 	}
@@ -379,15 +399,33 @@ func promptForModel(cmd *cobra.Command, provider string) (string, error) {
 
 	reader := bufio.NewReader(cmd.InOrStdin())
 
-	value, err := reader.ReadString('\n')
+	value, err := readLine(reader)
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return defaultModel, nil
+		}
+
 		return "", fmt.Errorf("read model: %w", err)
 	}
 
-	value = strings.TrimSpace(value)
 	if value == "" {
 		return defaultModel, nil
 	}
 
 	return value, nil
+}
+
+func readLine(reader *bufio.Reader) (string, error) {
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			if line == "" {
+				return "", err
+			}
+		} else {
+			return "", err
+		}
+	}
+
+	return strings.TrimSpace(line), nil
 }

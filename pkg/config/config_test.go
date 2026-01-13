@@ -125,6 +125,32 @@ func TestLoad_SpecificProviderEnvVars(t *testing.T) {
 	assert.Equal(t, "gemini-ultra", provider.Model)
 }
 
+func TestLoad_EnvAPIKeyDoesNotOverrideModel(t *testing.T) {
+	tmpDir := setupTestHome(t)
+	configDir := filepath.Join(tmpDir, ".config", "aida")
+	err := os.MkdirAll(configDir, 0o755)
+	require.NoError(t, err)
+
+	configContent := `
+[provider.aistudio]
+api_key = "file-key"
+model = "gemini-2.0-flash-exp"
+`
+	err = os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(configContent), 0o644)
+	require.NoError(t, err)
+
+	t.Setenv("AIDA_PROVIDER_AISTUDIO_API_KEY", "env-key")
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Equal(t, "aistudio", cfg.DefaultProvider)
+
+	provider, ok := cfg.Providers["aistudio"]
+	require.True(t, ok)
+	assert.Equal(t, "env-key", provider.APIKey)
+	assert.Equal(t, "gemini-2.0-flash-exp", provider.Model)
+}
+
 func TestLoad_Overrides(t *testing.T) {
 	tmpDir := setupTestHome(t)
 	configDir := filepath.Join(tmpDir, ".config", "aida")

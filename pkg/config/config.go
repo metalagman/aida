@@ -356,11 +356,29 @@ func applySpecificProviderEnvOverrides(cfg *Config) {
 
 		switch {
 		case strings.HasSuffix(remaining, "_API_KEY"):
-			name := strings.TrimSuffix(remaining, "_API_KEY")
-			cfg.UpsertProvider(NormalizeProviderName(name), ProviderConfig{APIKey: value})
+			name := NormalizeProviderName(strings.TrimSuffix(remaining, "_API_KEY"))
+			if name == "" {
+				continue
+			}
+
+			if provider, ok := cfg.Providers[name]; ok {
+				provider.APIKey = value
+				cfg.Providers[name] = provider
+			} else {
+				cfg.UpsertProvider(name, ProviderConfig{APIKey: value})
+			}
 		case strings.HasSuffix(remaining, "_MODEL"):
-			name := strings.TrimSuffix(remaining, "_MODEL")
-			cfg.UpsertProvider(NormalizeProviderName(name), ProviderConfig{Model: value})
+			name := NormalizeProviderName(strings.TrimSuffix(remaining, "_MODEL"))
+			if name == "" {
+				continue
+			}
+
+			if provider, ok := cfg.Providers[name]; ok {
+				provider.Model = value
+				cfg.Providers[name] = provider
+			} else {
+				cfg.UpsertProvider(name, ProviderConfig{Model: value})
+			}
 		}
 	}
 }

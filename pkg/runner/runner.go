@@ -81,7 +81,7 @@ func (r Runner) Run(ctx context.Context, prompt string, provider CommandGenerato
 
 		return nil
 	case ModeQuiet:
-		return r.Executor.Execute(ctx, command, r.Stdout, r.Stderr, r.Stdin)
+		return r.Executor.Execute(ctx, command, io.Discard, io.Discard, r.Stdin)
 	case ModeYOLO:
 		return r.runWithConfirmation(ctx, command, false)
 	default:

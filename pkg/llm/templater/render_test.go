@@ -24,6 +24,7 @@ func TestRender(t *testing.T) {
 		type inner struct {
 			Bar string
 		}
+
 		type data struct {
 			Foo *inner
 		}

@@ -123,7 +123,7 @@ func TestRunnerUnableToRunLocal(t *testing.T) {
 	assert.Contains(t, stdout.String(), "Unable to process the request locally")
 }
 
-func TestRunnerQuietDisplaysCommandOutput(t *testing.T) {
+func TestRunnerQuietSuppressesCommandOutput(t *testing.T) {
 	var stdout bytes.Buffer
 
 	exec := &fakeExecutor{}
@@ -136,7 +136,7 @@ func TestRunnerQuietDisplaysCommandOutput(t *testing.T) {
 
 	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls -la"})
 	require.NoError(t, err)
-	assert.Equal(t, "total 0\n", stdout.String())
+	assert.Equal(t, "", stdout.String())
 	assert.True(t, exec.called)
 }
 

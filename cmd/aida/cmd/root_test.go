@@ -1,6 +1,7 @@
 package cmd_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/metalagman/aida/cmd/aida/cmd"
@@ -40,5 +41,22 @@ func TestPromptFromArgs(t *testing.T) {
 				t.Fatalf("PromptFromArgs(%v, %d) = %q, want %q", tc.args, tc.dashIndex, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestRootCmdRejectsUnknownProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+
+	t.Cleanup(func() {
+		os.Setenv("HOME", origHome)
+	})
+	os.Setenv("HOME", tmpDir)
+
+	root := cmd.NewRootCmd()
+	root.SetArgs([]string{"--provider", "unknown", "--", "list"})
+
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected error for unsupported provider")
 	}
 }
