@@ -18,6 +18,30 @@
 
 ## Setup
 
+## Installation
+
+Download the binary from the latest GitHub release:
+
+```
+curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-linux-amd64
+chmod +x /usr/local/bin/aida
+```
+
+macOS (Apple Silicon):
+```
+curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-darwin-arm64
+chmod +x /usr/local/bin/aida
+```
+
+Linux (arm64):
+```
+curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-linux-arm64
+chmod +x /usr/local/bin/aida
+```
+
+Replace the URL with the appropriate artifact from:
+https://github.com/metalagman/aida/releases/latest
+
 1) Configure a provider:
 ```
 aida providers configure aistudio
