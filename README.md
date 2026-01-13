@@ -83,7 +83,6 @@ aida --dry-run -- find large files
 List models for a provider:
 ```
 aida providers models aistudio
-aida providers models openai --all
 aida providers models openai --api-key YOUR_KEY
 ```
 
