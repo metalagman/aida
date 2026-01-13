@@ -9,7 +9,29 @@ permissions:
   contents: write
 
 jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.8.0
+          args: --timeout=5m
+
+      - name: Test
+        run: go test -v -race ./...
+
   build:
+    needs: qa
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

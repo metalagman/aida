@@ -22,6 +22,7 @@
 - Go style: follow Go Google style decisions, Go Google best practices, and the Go Google style guide.
 - Commits: follow Conventional Commits.
 - Packaging: use `internal/` for non-exported code; only public APIs stay outside `internal/`.
+- Release workflow: run lint and tests before building release artifacts.
 
 ## Development workflow
 1. Plan the work.
