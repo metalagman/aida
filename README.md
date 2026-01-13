@@ -6,6 +6,8 @@
 [![version](https://img.shields.io/github/v/release/metalagman/aida?sort=semver)](https://github.com/metalagman/aida/releases)
 [![license](https://img.shields.io/github/license/metalagman/aida)](LICENSE)
 
+<img src="docs/assets/logo.png" alt="aida logo" height="120px">
+
 `aida` translates natural language prompts into shell commands and executes them directly in your terminal.
 
 ## Requirements
