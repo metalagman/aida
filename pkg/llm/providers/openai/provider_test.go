@@ -1,4 +1,4 @@
-package llm_test
+package openai_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/metalagman/aida/pkg/config"
-	"github.com/metalagman/aida/pkg/llm"
+	"github.com/metalagman/aida/pkg/llm/providers/openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,10 +31,10 @@ func TestOpenAIProvider_GenerateCommand(t *testing.T) {
 	}))
 	defer server.Close()
 
-	llm.SetOpenAIBaseURL(server.URL)
-	defer llm.SetOpenAIBaseURL("https://api.openai.com/v1")
+	openai.SetOpenAIBaseURL(server.URL)
+	defer openai.SetOpenAIBaseURL("https://api.openai.com/v1")
 
-	p, err := llm.NewOpenAIProvider("test-key", "gpt-4o")
+	p, err := openai.NewProvider("test-key", "gpt-4o")
 	require.NoError(t, err)
 
 	cmd, err := p.GenerateCommand(context.Background(), "list files")
@@ -44,19 +44,19 @@ func TestOpenAIProvider_GenerateCommand(t *testing.T) {
 
 func TestNewOpenAIProvider(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
-		p, err := llm.NewOpenAIProvider("key", "model")
+		p, err := openai.NewProvider("key", "model")
 		require.NoError(t, err)
 		assert.NotNil(t, p)
 		assert.Equal(t, "openai", p.Name())
 	})
 
 	t.Run("missing api key", func(t *testing.T) {
-		_, err := llm.NewOpenAIProvider("", "model")
+		_, err := openai.NewProvider("", "model")
 		assert.Error(t, err)
 	})
 
 	t.Run("missing model", func(t *testing.T) {
-		_, err := llm.NewOpenAIProvider("key", "")
+		_, err := openai.NewProvider("key", "")
 		assert.Error(t, err)
 	})
 }
@@ -75,10 +75,10 @@ func TestListOpenAIModels(t *testing.T) {
 	}))
 	defer server.Close()
 
-	llm.SetOpenAIBaseURL(server.URL)
-	defer llm.SetOpenAIBaseURL("https://api.openai.com/v1")
+	openai.SetOpenAIBaseURL(server.URL)
+	defer openai.SetOpenAIBaseURL("https://api.openai.com/v1")
 
-	models, err := llm.ListModels(context.Background(), "openai", config.ProviderConfig{APIKey: "test-key"})
+	models, err := openai.ListModels(context.Background(), config.ProviderConfig{APIKey: "test-key"})
 	require.NoError(t, err)
 	assert.Len(t, models, 2)
 	assert.Equal(t, "gpt-4o", models[0].Name)

@@ -1,4 +1,4 @@
-package llm
+package openai
 
 import (
 	"context"
@@ -7,10 +7,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
-)
 
-var (
-	openAIBaseURL = "https://api.openai.com/v1"
+	"github.com/metalagman/aida/pkg/config"
+	"github.com/metalagman/aida/pkg/llm/provider"
 )
 
 type openAIModelList struct {
@@ -21,14 +20,40 @@ type openAIModel struct {
 	ID string `json:"id"`
 }
 
-func listOpenAIModels(ctx context.Context, apiKey string) ([]ModelInfo, error) {
-	if strings.TrimSpace(apiKey) == "" {
+func ListModels(ctx context.Context, cfg config.ProviderConfig) ([]provider.ModelInfo, error) {
+	apiKey := strings.TrimSpace(cfg.APIKey)
+	if apiKey == "" {
 		return nil, fmt.Errorf("api_key is required for openai provider")
 	}
 
-	client := &http.Client{Timeout: openAITimeout}
+	client, err := openAIClient()
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, openAIBaseURL+"/models", nil)
+	respBody, err := fetchModelList(ctx, client, apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseModelList(respBody)
+}
+
+func openAIClient() (*http.Client, error) {
+	factory := getOpenAIHTTPClientFactory()
+
+	client := factory()
+	if client == nil {
+		return nil, fmt.Errorf("openai http client factory returned nil")
+	}
+
+	return client, nil
+}
+
+func fetchModelList(ctx context.Context, client *http.Client, apiKey string) ([]byte, error) {
+	endpoint := getOpenAIBaseURL() + "/models"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create openai request: %w", err)
 	}
@@ -50,19 +75,23 @@ func listOpenAIModels(ctx context.Context, apiKey string) ([]ModelInfo, error) {
 		return nil, fmt.Errorf("openai request failed: %s", strings.TrimSpace(string(respBody)))
 	}
 
+	return respBody, nil
+}
+
+func parseModelList(respBody []byte) ([]provider.ModelInfo, error) {
 	var list openAIModelList
 	if err := json.Unmarshal(respBody, &list); err != nil {
 		return nil, fmt.Errorf("parse openai response: %w", err)
 	}
 
-	models := make([]ModelInfo, 0, len(list.Data))
+	models := make([]provider.ModelInfo, 0, len(list.Data))
 
 	for _, model := range list.Data {
 		if strings.TrimSpace(model.ID) == "" {
 			continue
 		}
 
-		models = append(models, ModelInfo{
+		models = append(models, provider.ModelInfo{
 			Name:             model.ID,
 			DisplayName:      model.ID,
 			SupportedActions: []string{"generateContent"},

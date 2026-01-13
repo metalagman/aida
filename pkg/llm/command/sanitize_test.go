@@ -1,9 +1,9 @@
-package llm_test
+package command_test
 
 import (
 	"testing"
 
-	"github.com/metalagman/aida/pkg/llm"
+	"github.com/metalagman/aida/pkg/llm/command"
 )
 
 func TestSanitizeCommand(t *testing.T) {
@@ -41,7 +41,7 @@ func TestSanitizeCommand(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := llm.SanitizeCommand(tc.input)
+			got := command.SanitizeCommand(tc.input)
 			if got != tc.want {
 				t.Fatalf("SanitizeCommand(%q) = %q, want %q", tc.input, got, tc.want)
 			}

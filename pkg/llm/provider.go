@@ -2,17 +2,15 @@ package llm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/metalagman/aida/pkg/config"
+	"github.com/metalagman/aida/pkg/llm/provider"
+	"github.com/metalagman/aida/pkg/llm/providers/aistudio"
+	"github.com/metalagman/aida/pkg/llm/providers/openai"
 )
 
-// Provider generates a single shell command from a user prompt.
-type Provider interface {
-	GenerateCommand(ctx context.Context, prompt string) (string, error)
-	Name() string
-}
+type Provider = provider.Provider
 
 // NewProvider constructs a provider based on config.
 func NewProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
@@ -23,17 +21,9 @@ func NewProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
 
 	switch name {
 	case "aistudio":
-		if active.APIKey == "" {
-			return nil, errors.New("api_key is required for aistudio provider")
-		}
-
-		return NewGoogleADKProvider(ctx, active.APIKey, active.Model)
+		return aistudio.NewProvider(ctx, active.APIKey, active.Model)
 	case "openai":
-		if active.APIKey == "" {
-			return nil, errors.New("api_key is required for openai provider")
-		}
-
-		return NewOpenAIProvider(active.APIKey, active.Model)
+		return openai.NewProvider(active.APIKey, active.Model)
 	default:
 		return nil, fmt.Errorf("unsupported llm provider %q", name)
 	}
