@@ -8,7 +8,7 @@
 
 ![aida logo](./docs/assets/logo.png)
 
-`aida` translates natural language prompts into shell commands and executes them directly in your terminal.
+`aida` (айда) translates natural language prompts into shell commands and executes them directly in your terminal.
 
 ## Requirements
 
