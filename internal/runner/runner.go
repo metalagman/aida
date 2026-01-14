@@ -96,7 +96,7 @@ const (
 
 func (r Runner) runWithConfirmation(ctx context.Context, command string, forceConfirm bool) error {
 	if forceConfirm {
-		if err := r.confirm(command); err != nil {
+		if err := r.confirm(ctx, command); err != nil {
 			return err
 		}
 	} else {
@@ -106,22 +106,41 @@ func (r Runner) runWithConfirmation(ctx context.Context, command string, forceCo
 	return r.Executor.Execute(ctx, command, r.Stdout, r.Stderr, r.Stdin)
 }
 
-func (r Runner) confirm(command string) error {
+func (r Runner) confirm(ctx context.Context, command string) error {
 	_, _ = fmt.Fprintf(r.Stdout, "I would run %s`%s`%s, confirm? [y/N] ", colorCyan, command, colorReset)
 
-	reader := bufio.NewReader(r.Stdin)
-
-	answer, err := reader.ReadString('\n')
-	if err != nil && !errors.Is(err, io.EOF) {
-		return fmt.Errorf("read confirmation: %w", err)
+	type readResult struct {
+		answer string
+		err    error
 	}
 
-	answer = strings.TrimSpace(strings.ToLower(answer))
-	if answer == "y" || answer == "yes" {
-		return nil
+	done := make(chan readResult, 1)
+
+	go func() {
+		reader := bufio.NewReader(r.Stdin)
+
+		answer, err := reader.ReadString('\n')
+
+		done <- readResult{answer, err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		_, _ = fmt.Fprintln(r.Stdout)
+
+		return ErrCancelled
+	case res := <-done:
+		if res.err != nil && !errors.Is(res.err, io.EOF) {
+			return fmt.Errorf("read confirmation: %w", res.err)
+		}
+
+		answer := strings.TrimSpace(strings.ToLower(res.answer))
+		if answer == "y" || answer == "yes" {
+			return nil
+		}
+
+		_, _ = fmt.Fprintln(r.Stdout, "Canceled.")
+
+		return ErrCancelled
 	}
-
-	_, _ = fmt.Fprintln(r.Stdout, "Canceled.")
-
-	return ErrCancelled
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/metalagman/aida/internal/runner"
 	"github.com/stretchr/testify/assert"
@@ -40,6 +41,36 @@ func (e *fakeExecutor) Execute(_ context.Context, command string, stdout, _ io.W
 	}
 
 	return nil
+}
+
+func TestRunnerConfirmContextCancel(t *testing.T) {
+	var stdout bytes.Buffer
+
+	exec := &fakeExecutor{}
+
+	// Create a pipe for stdin, but don't write anything to it.
+	// ReadString will block.
+	pr, _ := io.Pipe()
+
+	r := runner.Runner{
+		Mode:     runner.ModeConfirm,
+		Stdout:   &stdout,
+		Stdin:    pr,
+		Executor: exec,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context after a short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	err := r.Run(ctx, "list files", fakeProvider{command: "ls"})
+
+	assert.ErrorIs(t, err, runner.ErrCancelled)
+	assert.False(t, exec.called)
 }
 
 func TestRunnerConfirmYes(t *testing.T) {
