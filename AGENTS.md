@@ -20,6 +20,8 @@
 - Tests: tests must be written in `*_test` packages.
 - ACP integration tests: use provider-specific build tags only. Run Codex via `integration && codex`, OpenCode via `integration && opencode`, and Gemini via `integration && gemini`.
 - Build tasks: use `Taskfile`.
+- Omnidist: maintain `.omnidist/omnidist.yaml` as the authoritative npm distribution config for Aida.
+- Omnidist release workflow: keep the existing GitHub binary release workflow and add a separate tag-driven Omnidist npm publish workflow using `NPM_PUBLISH_TOKEN`.
 - Development: always write code as a senior Go developer.
 - Go style: follow Go Google style decisions, Go Google best practices, and the Go Google style guide.
 - Commits: follow Conventional Commits.
@@ -36,4 +38,4 @@
 7. Refactor & optimize: clean up to senior standards.
 8. Repeat steps 3-7 as needed until clean.
 9. Final verification: re-run lint and tests to ensure no regressions.
-10. Update README.md with latest changes to envs, args, and related behavior.
+10. Update README.md with latest changes to envs, args, release/install behavior, and related environment requirements.

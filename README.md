@@ -1,4 +1,4 @@
-# aida - AI-Powered Shell Assistant
+# aida
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/metalagman/aida)](https://goreportcard.com/report/github.com/metalagman/aida)
 [![lint](https://github.com/metalagman/aida/actions/workflows/lint.yml/badge.svg)](https://github.com/metalagman/aida/actions/workflows/lint.yml)
@@ -8,7 +8,19 @@
 
 ![aida logo](./docs/assets/logo.png)
 
-`aida` (айда) translates natural language prompts into shell commands and executes them directly in your terminal.
+Turn popular CLI agents into a one-shot shell command runner.
+
+`aida` (айда) works with `Codex`, `OpenCode`, `Gemini`, `Copilot`, and `Claude Code` to generate terminal commands, then runs them with `confirm` mode by default so you stay in control.
+
+## Quickstart
+
+```bash
+npm install -g @metalagman/aida
+aida init
+aida -- list the largest files in this repo
+```
+
+`aida init` writes `~/.config/aida/config.yaml` with detected ACP providers in the live config and a full commented reference block for ACP, pool, and API-backed provider shapes.
 
 ## Requirements
 
@@ -21,21 +33,43 @@
 
 ## Installation
 
-Download the binary from the latest GitHub release:
+Install from npm:
 
+```bash
+npm install -g @metalagman/aida
 ```
+
+Initialize the canonical config file:
+
+```bash
+aida init
+```
+
+If no ACP CLI is detected in `PATH`, set `aida.provider` manually after init.
+
+To rewrite an existing config:
+
+```bash
+aida init --force
+```
+
+### Alternative Installation
+
+Manual binary install from the latest GitHub release:
+
+```bash
 curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-linux-amd64
 chmod +x /usr/local/bin/aida
 ```
 
 macOS (Apple Silicon):
-```
+```bash
 curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-darwin-arm64
 chmod +x /usr/local/bin/aida
 ```
 
 Linux (arm64):
-```
+```bash
 curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-linux-arm64
 chmod +x /usr/local/bin/aida
 ```
@@ -43,24 +77,11 @@ chmod +x /usr/local/bin/aida
 Replace the URL with the appropriate artifact from:
 https://github.com/metalagman/aida/releases/latest
 
-Initialize the canonical config file:
-```
-aida init
-```
-
-This writes `~/.config/aida/config.yaml` with detected ACP providers in the live config and a full commented reference block for ACP, pool, and API-backed provider shapes.
-
-If no ACP CLI is detected in `PATH`, set `aida.provider` manually after init.
-
-Example:
-```
-aida init --force
-```
-
 ## Usage
 
 Generate and run a command (defaults to `confirm` mode):
-```
+
+```bash
 aida -- find all files in current directory and change end lines from crlf to lf
 ```
 
@@ -71,7 +92,8 @@ Execution modes:
 - `--dry-run`: Outputs the generated command to the terminal without executing it.
 
 Examples:
-```
+
+```bash
 aida --yolo -- list files
 aida --quiet -- show git status
 aida --dry-run -- find large files
@@ -148,6 +170,16 @@ profiles:
 
 By default, `aida init` writes only detected ACP providers into the live `runtime.providers` section. The `openai`, `aistudio`, `pool`, and example profile entries above are kept in the commented reference block for manual use.
 
+### Default Models
+
+- `codex`: `gpt-5.3-codex`
+- `opencode`: `opencode/big-pickle`
+- `copilot`: `gpt-5-codex`
+- `gemini`: `gemini-3-flash-preview`
+- `claude_code`: `claude-sonnet-4`
+- `openai`: `gpt-4o-mini`
+- `aistudio`: `gemini-2.5-flash`
+
 ### Environment Variables
 
 Environment values override the YAML file:
@@ -162,16 +194,25 @@ Environment values override the YAML file:
 
 ## Development
 
-```
+```bash
 task build
 task test
 task test:integration
 task test:integration:opencode
 task test:integration:gemini
 task lint
+task omnidist:build
+task omnidist:stage
+task omnidist:verify
 ```
 
 `task test:integration` runs the Codex ACP integration test behind `integration && codex`. `task test:integration:opencode` runs OpenCode behind `integration && opencode`. `task test:integration:gemini` runs Gemini behind `integration && gemini`. These are intentionally separate from `go test ./...` because they depend on local CLI/auth state.
+
+## Release
+
+Tag pushes continue to build GitHub release binaries through `.github/workflows/release.yml`.
+
+NPM publishing is handled separately through `.github/workflows/omnidist-release.yml`, which builds and verifies the Omnidist package and then publishes `@metalagman/aida`. Maintainers need `NPM_PUBLISH_TOKEN` configured in GitHub Actions secrets.
 
 ## License
 

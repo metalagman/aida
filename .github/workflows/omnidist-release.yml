@@ -1,0 +1,87 @@
+# Generated and maintained for Omnidist npm releases.
+name: omnidist-release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+      - uses: actions/setup-node@v4
+      - name: Validate tag checkout for git-tag versioning
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            echo "omnidist-release must run on a tag ref"
+            exit 1
+          fi
+
+          tag_commit="$(git rev-list -n 1 "${GITHUB_REF_NAME}")"
+          head_commit="$(git rev-parse HEAD)"
+
+          if [[ "${tag_commit}" != "${head_commit}" ]]; then
+            echo "tag ${GITHUB_REF_NAME} does not point at checked out commit"
+            exit 1
+          fi
+      - name: Install omnidist
+        run: npm install -g "@omnidist/omnidist@0.1.25"
+      - name: Build artifacts
+        run: omnidist --profile "aida" build
+      - name: Stage npm package
+        run: omnidist --profile "aida" npm stage
+      - name: Verify staged package
+        run: omnidist --profile "aida" npm verify
+      - name: Pack staged artifacts
+        run: tar -czf omnidist-staged.tgz .omnidist/aida
+      - name: Upload staged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnidist-staged
+          path: omnidist-staged.tgz
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnidist-dist
+          path: .omnidist/aida/dist/**/*
+          if-no-files-found: error
+
+  publish_npm:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NPM_PUBLISH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-node@v4
+      - name: Install omnidist
+        run: npm install -g "@omnidist/omnidist@0.1.25"
+      - name: Download staged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: omnidist-staged
+      - name: Restore staged artifacts
+        run: tar -xzf omnidist-staged.tgz
+      - name: Verify staged package
+        run: omnidist --profile "aida" npm verify
+      - name: Publish npm package
+        run: omnidist --profile "aida" npm publish

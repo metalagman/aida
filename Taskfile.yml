@@ -33,6 +33,41 @@ tasks:
     cmds:
       - go install ./cmd/aida
 
+  omnidist:init:
+    desc: Bootstrap Omnidist workspace once
+    cmds:
+      - |
+        if [ -f .omnidist/omnidist.yaml ]; then
+          echo ".omnidist/omnidist.yaml already exists; skipping init"
+        else
+          npx -y @omnidist/omnidist@latest init
+        fi
+
+  omnidist:ci:
+    desc: Generate Omnidist GitHub release workflow once
+    cmds:
+      - |
+        if [ -f .github/workflows/omnidist-release.yml ]; then
+          echo ".github/workflows/omnidist-release.yml already exists; skipping ci generation"
+        else
+          npx -y @omnidist/omnidist@latest ci
+        fi
+
+  omnidist:build:
+    desc: Build Omnidist artifacts
+    cmds:
+      - npx -y @omnidist/omnidist@latest --profile aida build
+
+  omnidist:stage:
+    desc: Stage Omnidist npm artifacts
+    cmds:
+      - npx -y @omnidist/omnidist@latest --profile aida npm stage
+
+  omnidist:verify:
+    desc: Verify Omnidist staged npm artifacts
+    cmds:
+      - npx -y @omnidist/omnidist@latest --profile aida npm verify
+
   lint:
     desc: Run golangci-lint
     cmds:
