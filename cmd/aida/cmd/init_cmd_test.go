@@ -1,49 +1,32 @@
-//nolint:testpackage // white-box coverage for init helpers is intentional here.
-package cmd
+package cmd_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/metalagman/aida/cmd/aida/cmd"
 	"github.com/metalagman/aida/internal/config"
 )
 
-func TestBuildInitConfigIncludesRemoteProviderTypes(t *testing.T) {
-	emptyPath := t.TempDir()
-	t.Setenv("PATH", emptyPath)
-
-	content, err := buildInitConfig()
-	if err != nil {
-		t.Fatalf("buildInitConfig() error = %v", err)
-	}
-
-	for _, want := range []string{
-		"runtime:",
-		"providers:",
-		"type: openai",
-		"type: aistudio",
-		"profiles:",
-		"# No supported ACP CLI was detected in PATH.",
-		"#       type: generic_acp",
-	} {
-		if !strings.Contains(content, want) {
-			t.Fatalf("buildInitConfig() missing %q in output:\n%s", want, content)
-		}
-	}
-}
-
-func TestRunInitWritesCanonicalConfig(t *testing.T) {
+func TestInitWritesCanonicalConfig(t *testing.T) {
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
 	binDir := t.TempDir()
 	t.Setenv("PATH", binDir)
 	writeExecutable(t, filepath.Join(binDir, "codex"))
 
-	cmd := newInitCmd()
-	if err := runInit(cmd, &initFlags{}); err != nil {
-		t.Fatalf("runInit() error = %v", err)
+	var stdout bytes.Buffer
+
+	root := cmd.NewRootCmd()
+	root.SetOut(&stdout)
+	root.SetErr(&stdout)
+	root.SetArgs([]string{"init"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("root.Execute() error = %v", err)
 	}
 
 	configPath := filepath.Join(tmpHome, ".config", "aida", "config.yaml")
@@ -54,11 +37,9 @@ func TestRunInitWritesCanonicalConfig(t *testing.T) {
 	}
 
 	content := string(data)
+	separator := "# ---------------------------------------------------------------------------"
+	liveConfig, _, _ := strings.Cut(content, separator)
 
-	liveConfig, _, _ := strings.Cut(
-		content,
-		"# ---------------------------------------------------------------------------",
-	)
 	for _, want := range []string{
 		"aida:",
 		"mode: confirm",
@@ -66,6 +47,8 @@ func TestRunInitWritesCanonicalConfig(t *testing.T) {
 		"type: codex_acp",
 		"codex_acp:",
 		"# Full config shape reference",
+		"type: openai",
+		"type: aistudio",
 	} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("generated config missing %q in output:\n%s", want, content)
@@ -84,7 +67,7 @@ func TestRunInitWritesCanonicalConfig(t *testing.T) {
 	}
 }
 
-func TestRunInitWritesPlanModeForOpenCodeAndGemini(t *testing.T) {
+func TestInitWritesPlanModeForOpenCodeAndGemini(t *testing.T) {
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
 	binDir := t.TempDir()
@@ -92,9 +75,11 @@ func TestRunInitWritesPlanModeForOpenCodeAndGemini(t *testing.T) {
 	writeExecutable(t, filepath.Join(binDir, "opencode"))
 	writeExecutable(t, filepath.Join(binDir, "gemini"))
 
-	cmd := newInitCmd()
-	if err := runInit(cmd, &initFlags{}); err != nil {
-		t.Fatalf("runInit() error = %v", err)
+	root := cmd.NewRootCmd()
+	root.SetArgs([]string{"init"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("root.Execute() error = %v", err)
 	}
 
 	cfg, err := config.Load()
@@ -108,7 +93,7 @@ func TestRunInitWritesPlanModeForOpenCodeAndGemini(t *testing.T) {
 	}
 
 	if got := opencodeCfg.OpenCodeACP.Mode; got != "plan" {
-		t.Fatalf("opencode mode = %q, want plan", got)
+		t.Fatalf("opencode mode = %q, want %q", got, "plan")
 	}
 
 	geminiCfg, ok := cfg.Runtime.Providers["gemini"]
@@ -117,19 +102,22 @@ func TestRunInitWritesPlanModeForOpenCodeAndGemini(t *testing.T) {
 	}
 
 	if got := geminiCfg.GeminiACP.Mode; got != "plan" {
-		t.Fatalf("gemini mode = %q, want plan", got)
+		t.Fatalf("gemini mode = %q, want %q", got, "plan")
 	}
 }
 
-func TestRunInitGeneratedConfigRoundTrips(t *testing.T) {
+func TestInitGeneratedConfigRoundTrips(t *testing.T) {
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
 	binDir := t.TempDir()
 	t.Setenv("PATH", binDir)
 	writeExecutable(t, filepath.Join(binDir, "codex"))
 
-	if err := runInit(newInitCmd(), &initFlags{}); err != nil {
-		t.Fatalf("runInit() error = %v", err)
+	root := cmd.NewRootCmd()
+	root.SetArgs([]string{"init"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("root.Execute() error = %v", err)
 	}
 
 	cfg, err := config.Load()
@@ -137,12 +125,40 @@ func TestRunInitGeneratedConfigRoundTrips(t *testing.T) {
 		t.Fatalf("config.Load() error = %v", err)
 	}
 
-	if got := cfg.Aida.Provider; got != "codex" {
-		t.Fatalf("cfg.Aida.Provider = %q, want codex", got)
+	if cfg.Aida.Provider != "codex" {
+		t.Fatalf("cfg.Aida.Provider = %q, want %q", cfg.Aida.Provider, "codex")
 	}
 
 	if err := cfg.ValidateSelectedRuntime(); err != nil {
 		t.Fatalf("cfg.ValidateSelectedRuntime() error = %v", err)
+	}
+}
+
+func TestInitWithoutDetectedProvidersIncludesWarning(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	t.Setenv("PATH", t.TempDir())
+
+	root := cmd.NewRootCmd()
+	root.SetArgs([]string{"init"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("root.Execute() error = %v", err)
+	}
+
+	path, err := config.ResolveConfigPath()
+	if err != nil {
+		t.Fatalf("ResolveConfigPath() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "# No supported ACP CLI was detected in PATH.") {
+		t.Fatalf("generated config missing no-provider warning:\n%s", content)
 	}
 }
 

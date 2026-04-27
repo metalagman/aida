@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/metalagman/aida/internal/runner"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type fakeExecutor struct {
@@ -34,30 +32,36 @@ func TestRunnerConfirmContextCancel(t *testing.T) {
 	var stdout bytes.Buffer
 
 	exec := &fakeExecutor{}
+	pr, pw := io.Pipe()
 
-	// Create a pipe for stdin, but don't write anything to it.
-	// ReadString will block.
-	pr, _ := io.Pipe()
+	t.Cleanup(func() {
+		_ = pr.Close()
+		_ = pw.Close()
+	})
 
 	r := runner.Runner{
 		Mode:     runner.ModeConfirm,
 		Stdout:   &stdout,
-		Stdin:    pr,
+		PromptIn: pr,
+		ExecIn:   strings.NewReader(""),
 		Executor: exec,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Cancel the context after a short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
 
 	err := r.Run(ctx, "ls")
+	if err != runner.ErrCancelled {
+		t.Fatalf("Run() error = %v, want %v", err, runner.ErrCancelled)
+	}
 
-	assert.ErrorIs(t, err, runner.ErrCancelled)
-	assert.False(t, exec.called)
+	if exec.called {
+		t.Fatal("Run() unexpectedly executed command after cancellation")
+	}
 }
 
 func TestRunnerConfirmYes(t *testing.T) {
@@ -67,21 +71,32 @@ func TestRunnerConfirmYes(t *testing.T) {
 	r := runner.Runner{
 		Mode:     runner.ModeConfirm,
 		Stdout:   &stdout,
-		Stdin:    strings.NewReader("y\n"),
+		PromptIn: io.NopCloser(strings.NewReader("y\n")),
+		ExecIn:   strings.NewReader(""),
 		Executor: exec,
 	}
 
 	err := r.Run(context.Background(), "ls -la")
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
 
-	require.NoError(t, err)
+	if !exec.called {
+		t.Fatal("Run() did not execute confirmed command")
+	}
 
-	assert.True(t, exec.called)
+	if exec.command != "ls -la" {
+		t.Fatalf("executed command = %q, want %q", exec.command, "ls -la")
+	}
 
-	assert.Equal(t, "ls -la", exec.command)
+	got := stdout.String()
+	if !strings.Contains(got, "I would run \x1b[36m`ls -la`\x1b[0m") {
+		t.Fatalf("stdout = %q, want confirmation prompt", got)
+	}
 
-	assert.Contains(t, stdout.String(), "I would run \x1b[36m`ls -la`\x1b[0m")
-
-	assert.NotContains(t, stdout.String(), "Running:")
+	if strings.Contains(got, "Running:") {
+		t.Fatalf("stdout = %q, did not expect yolo output", got)
+	}
 }
 
 func TestRunnerConfirmNo(t *testing.T) {
@@ -91,14 +106,23 @@ func TestRunnerConfirmNo(t *testing.T) {
 	r := runner.Runner{
 		Mode:     runner.ModeConfirm,
 		Stdout:   &stdout,
-		Stdin:    strings.NewReader("n\n"),
+		PromptIn: io.NopCloser(strings.NewReader("n\n")),
+		ExecIn:   strings.NewReader(""),
 		Executor: exec,
 	}
 
 	err := r.Run(context.Background(), "ls")
-	assert.ErrorIs(t, err, runner.ErrCancelled)
-	assert.False(t, exec.called)
-	assert.Contains(t, stdout.String(), "Canceled.")
+	if err != runner.ErrCancelled {
+		t.Fatalf("Run() error = %v, want %v", err, runner.ErrCancelled)
+	}
+
+	if exec.called {
+		t.Fatal("Run() unexpectedly executed rejected command")
+	}
+
+	if !strings.Contains(stdout.String(), "Canceled.") {
+		t.Fatalf("stdout = %q, want cancellation message", stdout.String())
+	}
 }
 
 func TestRunnerYOLO(t *testing.T) {
@@ -108,20 +132,31 @@ func TestRunnerYOLO(t *testing.T) {
 	r := runner.Runner{
 		Mode:     runner.ModeYOLO,
 		Stdout:   &stdout,
-		Stdin:    strings.NewReader(""),
+		PromptIn: io.NopCloser(strings.NewReader("")),
+		ExecIn:   strings.NewReader(""),
 		Executor: exec,
 	}
 
 	err := r.Run(context.Background(), "ls")
-	require.NoError(t, err)
-	assert.True(t, exec.called)
-	assert.Contains(t, stdout.String(), "Running: \x1b[36m`ls`\x1b[0m")
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if !exec.called {
+		t.Fatal("Run() did not execute yolo command")
+	}
+
+	if !strings.Contains(stdout.String(), "Running: \x1b[36m`ls`\x1b[0m") {
+		t.Fatalf("stdout = %q, want yolo banner", stdout.String())
+	}
 }
 
 func TestRunnerEmptyCommand(t *testing.T) {
 	r := runner.Runner{Mode: runner.ModeConfirm}
-	err := r.Run(context.Background(), " ")
-	assert.Error(t, err)
+
+	if err := r.Run(context.Background(), " "); err == nil {
+		t.Fatal("Run() error = nil, want error for empty command")
+	}
 }
 
 func TestRunnerUnableToRunLocal(t *testing.T) {
@@ -131,14 +166,23 @@ func TestRunnerUnableToRunLocal(t *testing.T) {
 	r := runner.Runner{
 		Mode:     runner.ModeConfirm,
 		Stdout:   &stdout,
-		Stdin:    strings.NewReader(""),
+		PromptIn: io.NopCloser(strings.NewReader("")),
+		ExecIn:   strings.NewReader(""),
 		Executor: exec,
 	}
 
 	err := r.Run(context.Background(), "UNABLE_TO_RUN_LOCAL")
-	assert.ErrorIs(t, err, runner.ErrCancelled)
-	assert.False(t, exec.called)
-	assert.Contains(t, stdout.String(), "Unable to process the request locally")
+	if err != runner.ErrCancelled {
+		t.Fatalf("Run() error = %v, want %v", err, runner.ErrCancelled)
+	}
+
+	if exec.called {
+		t.Fatal("Run() unexpectedly executed UNABLE_TO_RUN_LOCAL sentinel")
+	}
+
+	if !strings.Contains(stdout.String(), "Unable to process the request locally") {
+		t.Fatalf("stdout = %q, want local failure message", stdout.String())
+	}
 }
 
 func TestRunnerQuietSuppressesCommandOutput(t *testing.T) {
@@ -148,14 +192,23 @@ func TestRunnerQuietSuppressesCommandOutput(t *testing.T) {
 	r := runner.Runner{
 		Mode:     runner.ModeQuiet,
 		Stdout:   &stdout,
-		Stdin:    strings.NewReader(""),
+		PromptIn: io.NopCloser(strings.NewReader("")),
+		ExecIn:   strings.NewReader(""),
 		Executor: exec,
 	}
 
 	err := r.Run(context.Background(), "ls -la")
-	require.NoError(t, err)
-	assert.Equal(t, "", stdout.String())
-	assert.True(t, exec.called)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if stdout.String() != "" {
+		t.Fatalf("stdout = %q, want empty output in quiet mode", stdout.String())
+	}
+
+	if !exec.called {
+		t.Fatal("Run() did not execute quiet command")
+	}
 }
 
 func TestRunnerDryRunOutputsOnlyCommand(t *testing.T) {
@@ -165,12 +218,21 @@ func TestRunnerDryRunOutputsOnlyCommand(t *testing.T) {
 	r := runner.Runner{
 		Mode:     runner.ModeDryRun,
 		Stdout:   &stdout,
-		Stdin:    strings.NewReader(""),
+		PromptIn: io.NopCloser(strings.NewReader("")),
+		ExecIn:   strings.NewReader(""),
 		Executor: exec,
 	}
 
 	err := r.Run(context.Background(), "ls -la")
-	require.NoError(t, err)
-	assert.Equal(t, "ls -la\n", stdout.String())
-	assert.False(t, exec.called)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if stdout.String() != "ls -la\n" {
+		t.Fatalf("stdout = %q, want %q", stdout.String(), "ls -la\n")
+	}
+
+	if exec.called {
+		t.Fatal("Run() unexpectedly executed command in dry-run mode")
+	}
 }

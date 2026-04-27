@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"strings"
 
@@ -23,7 +24,8 @@ const (
 )
 
 const shellCommandContract = `You are a shell command generator.
-Return ONLY the raw shell command text that should be executed.
+	Return ONLY the raw shell command text that should be executed.
+	Return exactly one command line.
 Do not execute the request mentally and do not return the result of running the command.
 Do not call tools, inspect the filesystem, or query the environment beyond the request context you were given.
 Decide on the command from the request text alone.
@@ -119,7 +121,6 @@ func runAgentTurn(ctx context.Context, ag adkagent.Agent, prompt string) (string
 		return "", fmt.Errorf("create adk session: %w", err)
 	}
 
-	lastText := ""
 	initialContent := genai.NewContentFromText(prompt, genai.RoleUser)
 	events := r.Run(
 		ctx,
@@ -128,6 +129,22 @@ func runAgentTurn(ctx context.Context, ag adkagent.Agent, prompt string) (string
 		initialContent,
 		adkagent.RunConfig{},
 	)
+
+	lastText, err := collectLastEventText(events)
+	if err != nil {
+		return "", err
+	}
+
+	command, err := NormalizeCommand(lastText)
+	if err != nil {
+		return "", fmt.Errorf("%w: %q", err, snippet(lastText))
+	}
+
+	return command, nil
+}
+
+func collectLastEventText(events iter.Seq2[*session.Event, error]) (string, error) {
+	lastText := ""
 
 	for ev, runErr := range events {
 		if runErr != nil {
@@ -150,7 +167,7 @@ func runAgentTurn(ctx context.Context, ag adkagent.Agent, prompt string) (string
 		return "", fmt.Errorf("provider agent returned empty output")
 	}
 
-	return SanitizeCommand(lastText), nil
+	return lastText, nil
 }
 
 func contentText(content *genai.Content) string {

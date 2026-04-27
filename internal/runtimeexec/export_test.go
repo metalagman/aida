@@ -13,6 +13,7 @@ import (
 
 var ContentTextForTest = contentText
 var BuildUserPromptForTest = buildUserPrompt
+var NormalizeCommandForTest = NormalizeCommand
 
 func SetOSGetwdForTest(fn func() (string, error)) {
 	osGetwd = fn

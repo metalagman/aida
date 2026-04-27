@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -119,7 +120,8 @@ func setupRunner(cmd *cobra.Command, opts *cliOptions, cfg *config.Config) runne
 		Mode:     mode,
 		Stdout:   cmd.OutOrStdout(),
 		Stderr:   cmd.ErrOrStderr(),
-		Stdin:    cmd.InOrStdin(),
+		PromptIn: promptInput(cmd.InOrStdin()),
+		ExecIn:   cmd.InOrStdin(),
 		Executor: executor,
 	}
 }
@@ -183,9 +185,15 @@ func applyOverrides(cfg *config.Config, opts *cliOptions) error {
 		cfg.Aida.Shell = "/bin/sh"
 	}
 
-	_ = os.Setenv("AIDA_SHELL", cfg.Aida.Shell)
-
 	return applyProviderRuntimeOverrides(cfg, opts)
+}
+
+func promptInput(r io.Reader) io.ReadCloser {
+	if rc, ok := r.(io.ReadCloser); ok {
+		return rc
+	}
+
+	return io.NopCloser(r)
 }
 
 func resolveProviderName(cfg *config.Config, opts *cliOptions) string {

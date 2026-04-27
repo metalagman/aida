@@ -3,28 +3,31 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/metalagman/aida/internal/config"
 	"github.com/normahq/runtime/agentconfig"
 	runtimeconfig "github.com/normahq/runtime/appconfig"
-	"github.com/stretchr/testify/require"
 )
 
 const openAIMCPUnsupportedError = `provider "openai": agent config schema validation failed: ` +
 	`mcp_servers is not supported for type openai`
 
-func TestLoadProfile_DefaultProfileOverlay(t *testing.T) {
+func TestLoadProfileDefaultProfileOverlay(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
 	path, err := config.ResolveConfigPath()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("ResolveConfigPath() error = %v", err)
+	}
 
-	err = os.MkdirAll(filepath.Dir(path), 0o700)
-	require.NoError(t, err)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("MkdirAll(%q) error = %v", filepath.Dir(path), err)
+	}
 
-	err = os.WriteFile(path, []byte(`runtime:
+	if err := os.WriteFile(path, []byte(`runtime:
   providers:
     codex:
       type: codex_acp
@@ -43,37 +46,59 @@ profiles:
   default:
     aida:
       provider: openai
-`), 0o600)
-	require.NoError(t, err)
+`), 0o600); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", path, err)
+	}
 
 	cfg, err := config.Load()
-	require.NoError(t, err)
-	require.Equal(t, "openai", cfg.Aida.Provider)
-	require.Equal(t, "confirm", cfg.Aida.Mode)
-	require.Equal(t, "/bin/sh", cfg.Aida.Shell)
+	if err != nil {
+		t.Fatalf("config.Load() error = %v", err)
+	}
+
+	if cfg.Aida.Provider != "openai" {
+		t.Fatalf("cfg.Aida.Provider = %q, want %q", cfg.Aida.Provider, "openai")
+	}
+
+	if cfg.Aida.Mode != "confirm" {
+		t.Fatalf("cfg.Aida.Mode = %q, want %q", cfg.Aida.Mode, "confirm")
+	}
+
+	if cfg.Aida.Shell != "/bin/sh" {
+		t.Fatalf("cfg.Aida.Shell = %q, want %q", cfg.Aida.Shell, "/bin/sh")
+	}
 }
 
-func TestLoadProfile_ExplicitMissingProfileFails(t *testing.T) {
+func TestLoadProfileExplicitMissingProfileFails(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
 	path, err := config.ResolveConfigPath()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("ResolveConfigPath() error = %v", err)
+	}
 
-	err = os.MkdirAll(filepath.Dir(path), 0o700)
-	require.NoError(t, err)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("MkdirAll(%q) error = %v", filepath.Dir(path), err)
+	}
 
-	err = os.WriteFile(path, []byte(`runtime:
+	if err := os.WriteFile(path, []byte(`runtime:
   providers:
     codex:
       type: codex_acp
       codex_acp:
         model: gpt-5.3-codex
-`), 0o600)
-	require.NoError(t, err)
+`), 0o600); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", path, err)
+	}
 
 	_, err = config.LoadProfile("missing")
-	require.EqualError(t, err, `top-level profile "missing" not found`)
+	if err == nil {
+		t.Fatal("LoadProfile(missing) error = nil, want missing profile error")
+	}
+
+	if err.Error() != `top-level profile "missing" not found` {
+		t.Fatalf("LoadProfile(missing) error = %q", err)
+	}
 }
 
 func TestConfigRuntimeOverrides(t *testing.T) {
@@ -86,30 +111,43 @@ func TestConfigRuntimeOverrides(t *testing.T) {
 		},
 	}
 
-	err := cfg.SetProviderModel("openai", "gpt-5")
-	require.NoError(t, err)
-	err = cfg.SetProviderAPIKey("openai", "test-key")
-	require.NoError(t, err)
+	if err := cfg.SetProviderModel("openai", "gpt-5"); err != nil {
+		t.Fatalf("SetProviderModel() error = %v", err)
+	}
+
+	if err := cfg.SetProviderAPIKey("openai", "test-key"); err != nil {
+		t.Fatalf("SetProviderAPIKey() error = %v", err)
+	}
 
 	provider := cfg.Runtime.Providers["openai"]
-	require.Equal(t, "gpt-5", provider.OpenAI.Model)
-	require.Equal(t, "test-key", provider.OpenAI.APIKey)
+	if provider.OpenAI.Model != "gpt-5" {
+		t.Fatalf("provider.OpenAI.Model = %q, want %q", provider.OpenAI.Model, "gpt-5")
+	}
 
-	err = cfg.SetProviderAPIKey("codex", "bad")
-	require.EqualError(t, err, "--api-key is only supported for openai and aistudio providers")
+	if provider.OpenAI.APIKey != "test-key" {
+		t.Fatalf("provider.OpenAI.APIKey = %q, want %q", provider.OpenAI.APIKey, "test-key")
+	}
+
+	err := cfg.SetProviderAPIKey("codex", "bad")
+	if err == nil || err.Error() != "--api-key is only supported for openai and aistudio providers" {
+		t.Fatalf("SetProviderAPIKey(codex) error = %v", err)
+	}
 }
 
-func TestLoadProfile_IgnoresInvalidInactiveProvider(t *testing.T) {
+func TestLoadProfileIgnoresInvalidInactiveProvider(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
 	path, err := config.ResolveConfigPath()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("ResolveConfigPath() error = %v", err)
+	}
 
-	err = os.MkdirAll(filepath.Dir(path), 0o700)
-	require.NoError(t, err)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("MkdirAll(%q) error = %v", filepath.Dir(path), err)
+	}
 
-	err = os.WriteFile(path, []byte(`runtime:
+	if err := os.WriteFile(path, []byte(`runtime:
   providers:
     codex:
       type: codex_acp
@@ -126,25 +164,34 @@ func TestLoadProfile_IgnoresInvalidInactiveProvider(t *testing.T) {
       type: stdio
 aida:
   provider: codex
-`), 0o600)
-	require.NoError(t, err)
+`), 0o600); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", path, err)
+	}
 
 	cfg, err := config.Load()
-	require.NoError(t, err)
-	require.NoError(t, cfg.ValidateSelectedRuntime())
+	if err != nil {
+		t.Fatalf("config.Load() error = %v", err)
+	}
+
+	if err := cfg.ValidateSelectedRuntime(); err != nil {
+		t.Fatalf("ValidateSelectedRuntime() error = %v", err)
+	}
 }
 
-func TestLoadProfile_RejectsMalformedOldInitConfig(t *testing.T) {
+func TestLoadProfileRejectsMalformedOldInitConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
 	path, err := config.ResolveConfigPath()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("ResolveConfigPath() error = %v", err)
+	}
 
-	err = os.MkdirAll(filepath.Dir(path), 0o700)
-	require.NoError(t, err)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("MkdirAll(%q) error = %v", filepath.Dir(path), err)
+	}
 
-	err = os.WriteFile(path, []byte(`runtime:
+	if err := os.WriteFile(path, []byte(`runtime:
   providers:
     codex:
       type: codex_acp
@@ -152,16 +199,25 @@ func TestLoadProfile_RejectsMalformedOldInitConfig(t *testing.T) {
         model: gpt-5.3-codex
 aida:
   provider: codex
-`), 0o600)
-	require.NoError(t, err)
+`), 0o600); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", path, err)
+	}
 
 	_, err = config.Load()
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "generated by a buggy version of aida init")
-	require.Contains(t, err.Error(), "rerun `aida init --force`")
+	if err == nil {
+		t.Fatal("config.Load() error = nil, want malformed init error")
+	}
+
+	if !strings.Contains(err.Error(), "generated by a buggy version of aida init") {
+		t.Fatalf("config.Load() error = %q, want malformed init message", err)
+	}
+
+	if !strings.Contains(err.Error(), "rerun `aida init --force`") {
+		t.Fatalf("config.Load() error = %q, want remediation", err)
+	}
 }
 
-func TestValidateSelectedRuntime_SelectedInvalidProviderFails(t *testing.T) {
+func TestValidateSelectedRuntimeSelectedInvalidProviderFails(t *testing.T) {
 	cfg := &config.Config{
 		Runtime: runtimeconfig.RuntimeConfig{
 			Providers: map[string]agentconfig.Config{
@@ -181,10 +237,12 @@ func TestValidateSelectedRuntime_SelectedInvalidProviderFails(t *testing.T) {
 	}
 
 	err := cfg.ValidateSelectedRuntime()
-	require.EqualError(t, err, openAIMCPUnsupportedError)
+	if err == nil || err.Error() != openAIMCPUnsupportedError {
+		t.Fatalf("ValidateSelectedRuntime() error = %v, want %q", err, openAIMCPUnsupportedError)
+	}
 }
 
-func TestValidateSelectedRuntime_SelectedProviderIgnoresInactiveBrokenMCP(t *testing.T) {
+func TestValidateSelectedRuntimeSelectedProviderIgnoresInactiveBrokenMCP(t *testing.T) {
 	cfg := &config.Config{
 		Runtime: runtimeconfig.RuntimeConfig{
 			Providers: map[string]agentconfig.Config{
@@ -213,10 +271,12 @@ func TestValidateSelectedRuntime_SelectedProviderIgnoresInactiveBrokenMCP(t *tes
 		},
 	}
 
-	require.NoError(t, cfg.ValidateSelectedRuntime())
+	if err := cfg.ValidateSelectedRuntime(); err != nil {
+		t.Fatalf("ValidateSelectedRuntime() error = %v", err)
+	}
 }
 
-func TestValidateSelectedRuntime_SelectedPoolValidatesMembers(t *testing.T) {
+func TestValidateSelectedRuntimeSelectedPoolValidatesMembers(t *testing.T) {
 	cfg := &config.Config{
 		Runtime: runtimeconfig.RuntimeConfig{
 			Providers: map[string]agentconfig.Config{
@@ -248,7 +308,9 @@ func TestValidateSelectedRuntime_SelectedPoolValidatesMembers(t *testing.T) {
 	}
 
 	err := cfg.ValidateSelectedRuntime()
-	require.EqualError(t, err, openAIMCPUnsupportedError)
+	if err == nil || err.Error() != openAIMCPUnsupportedError {
+		t.Fatalf("ValidateSelectedRuntime() error = %v, want %q", err, openAIMCPUnsupportedError)
+	}
 }
 
 func runtimeConfigWithProviders() runtimeconfig.RuntimeConfig {

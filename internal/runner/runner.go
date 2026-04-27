@@ -48,7 +48,8 @@ type Runner struct {
 	Mode     RunMode
 	Stdout   io.Writer
 	Stderr   io.Writer
-	Stdin    io.Reader
+	PromptIn io.ReadCloser
+	ExecIn   io.Reader
 	Executor Executor
 }
 
@@ -72,7 +73,7 @@ func (r Runner) Run(ctx context.Context, command string) error {
 
 		return nil
 	case ModeQuiet:
-		return r.Executor.Execute(ctx, command, io.Discard, io.Discard, r.Stdin)
+		return r.Executor.Execute(ctx, command, io.Discard, io.Discard, r.execIn())
 	case ModeYOLO:
 		return r.runWithConfirmation(ctx, command, false)
 	default:
@@ -94,7 +95,7 @@ func (r Runner) runWithConfirmation(ctx context.Context, command string, forceCo
 		_, _ = fmt.Fprintf(r.Stdout, "Running: %s`%s`%s\n", colorCyan, command, colorReset)
 	}
 
-	return r.Executor.Execute(ctx, command, r.Stdout, r.Stderr, r.Stdin)
+	return r.Executor.Execute(ctx, command, r.Stdout, r.Stderr, r.execIn())
 }
 
 func (r Runner) confirm(ctx context.Context, command string) error {
@@ -106,9 +107,10 @@ func (r Runner) confirm(ctx context.Context, command string) error {
 	}
 
 	done := make(chan readResult, 1)
+	promptIn := r.promptIn()
 
 	go func() {
-		reader := bufio.NewReader(r.Stdin)
+		reader := bufio.NewReader(promptIn)
 
 		answer, err := reader.ReadString('\n')
 
@@ -117,6 +119,10 @@ func (r Runner) confirm(ctx context.Context, command string) error {
 
 	select {
 	case <-ctx.Done():
+		_ = promptIn.Close()
+
+		<-done
+
 		_, _ = fmt.Fprintln(r.Stdout)
 
 		return ErrCancelled
@@ -134,4 +140,28 @@ func (r Runner) confirm(ctx context.Context, command string) error {
 
 		return ErrCancelled
 	}
+}
+
+func (r Runner) promptIn() io.ReadCloser {
+	if r.PromptIn != nil {
+		return r.PromptIn
+	}
+
+	if r.ExecIn == nil {
+		return io.NopCloser(strings.NewReader(""))
+	}
+
+	return io.NopCloser(r.ExecIn)
+}
+
+func (r Runner) execIn() io.Reader {
+	if r.ExecIn != nil {
+		return r.ExecIn
+	}
+
+	if r.PromptIn != nil {
+		return r.PromptIn
+	}
+
+	return strings.NewReader("")
 }

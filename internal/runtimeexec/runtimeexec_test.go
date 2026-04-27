@@ -160,14 +160,76 @@ func TestGenerateCommandIncludesProviderStderrOnBuildError(t *testing.T) {
 	}
 }
 
-func TestSanitizeCommand(t *testing.T) {
+func TestNormalizeCommand(t *testing.T) {
 	t.Parallel()
 
-	got := runtimeexec.SanitizeCommand("```sh\nfind . -name '*.go' | wc -l\n```")
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr string
+	}{
+		{
+			name:  "plain command",
+			input: "find . -name '*.go' | wc -l",
+			want:  "find . -name '*.go' | wc -l",
+		},
+		{
+			name:  "fenced command",
+			input: "```sh\nfind . -name '*.go' | wc -l\n```",
+			want:  "find . -name '*.go' | wc -l",
+		},
+		{
+			name:  "unable to run local",
+			input: "UNABLE_TO_RUN_LOCAL",
+			want:  "UNABLE_TO_RUN_LOCAL",
+		},
+		{
+			name:    "prose prefix rejected",
+			input:   "I would run find . -name '*.go' | wc -l",
+			wantErr: "provider agent returned non-command output",
+		},
+		{
+			name:    "label rejected",
+			input:   "command: find . -name '*.go' | wc -l",
+			wantErr: "provider agent returned non-command output",
+		},
+		{
+			name:    "multiple lines rejected",
+			input:   "find . -name '*.go'\nwc -l",
+			wantErr: "provider agent returned non-command output",
+		},
+	}
 
-	want := "find . -name '*.go' | wc -l"
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assertNormalizedCommand(t, tc.input, tc.want, tc.wantErr)
+		})
+	}
+}
+
+func assertNormalizedCommand(t *testing.T, input, want, wantErr string) {
+	t.Helper()
+
+	got, err := runtimeexec.NormalizeCommandForTest(input)
+	if wantErr != "" {
+		if err == nil {
+			t.Fatalf("NormalizeCommandForTest(%q) error = nil, want %q", input, wantErr)
+		}
+
+		if err.Error() != wantErr {
+			t.Fatalf("NormalizeCommandForTest(%q) error = %q, want %q", input, err, wantErr)
+		}
+
+		return
+	}
+
+	if err != nil {
+		t.Fatalf("NormalizeCommandForTest(%q) error = %v", input, err)
+	}
+
 	if got != want {
-		t.Fatalf("SanitizeCommand() = %q, want %q", got, want)
+		t.Fatalf("NormalizeCommandForTest(%q) = %q, want %q", input, got, want)
 	}
 }
 
