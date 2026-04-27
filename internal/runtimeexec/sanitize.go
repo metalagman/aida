@@ -1,8 +1,6 @@
-package command
+package runtimeexec
 
-import (
-	"strings"
-)
+import "strings"
 
 func SanitizeCommand(input string) string {
 	trimmed := strings.TrimSpace(input)

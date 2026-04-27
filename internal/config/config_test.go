@@ -3,238 +3,269 @@ package config_test
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/metalagman/aida/internal/config"
-	"github.com/stretchr/testify/assert"
+	"github.com/normahq/runtime/agentconfig"
+	runtimeconfig "github.com/normahq/runtime/appconfig"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestHome(t *testing.T) string {
+const openAIMCPUnsupportedError = `provider "openai": agent config schema validation failed: ` +
+	`mcp_servers is not supported for type openai`
+
+func TestLoadProfile_DefaultProfileOverlay(t *testing.T) {
 	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
+	t.Setenv("HOME", tmpDir)
 
-	t.Cleanup(func() {
-		os.Setenv("HOME", origHome)
-	})
-	os.Setenv("HOME", tmpDir)
-
-	return tmpDir
-}
-
-func assertConfigLoaded(t *testing.T, cfg *config.Config) {
-	require.Equal(t, "aistudio", cfg.DefaultProvider)
-	require.Len(t, cfg.Providers, 1)
-
-	provider, ok := cfg.Providers["aistudio"]
-	require.True(t, ok)
-	assert.Equal(t, "test-key", provider.APIKey)
-	assert.Equal(t, "gemini-2.0-flash-exp", provider.Model)
-	assert.Equal(t, "confirm", cfg.Mode)
-	assert.Equal(t, "/bin/sh", cfg.Shell)
-}
-
-func TestLoad_TOML(t *testing.T) {
-	tmpDir := setupTestHome(t)
-	configDir := filepath.Join(tmpDir, ".config", "aida")
-	err := os.MkdirAll(configDir, 0o755)
+	path, err := config.ResolveConfigPath()
 	require.NoError(t, err)
 
-	configContent := `
-[provider.aistudio]
-api_key = "test-key"
-model = "gemini-2.0-flash-exp"
-`
-	err = os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(configContent), 0o644)
+	err = os.MkdirAll(filepath.Dir(path), 0o700)
+	require.NoError(t, err)
+
+	err = os.WriteFile(path, []byte(`runtime:
+  providers:
+    codex:
+      type: codex_acp
+      codex_acp:
+        model: gpt-5.3-codex
+    openai:
+      type: openai
+      openai:
+        api_key: file-key
+        model: gpt-4o-mini
+aida:
+  provider: codex
+  mode: confirm
+  shell: /bin/sh
+profiles:
+  default:
+    aida:
+      provider: openai
+`), 0o600)
 	require.NoError(t, err)
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
-	assertConfigLoaded(t, cfg)
+	require.Equal(t, "openai", cfg.Aida.Provider)
+	require.Equal(t, "confirm", cfg.Aida.Mode)
+	require.Equal(t, "/bin/sh", cfg.Aida.Shell)
 }
 
-func TestLoad_YAML(t *testing.T) {
-	tmpDir := setupTestHome(t)
-	configDir := filepath.Join(tmpDir, ".config", "aida")
-	err := os.MkdirAll(configDir, 0o755)
-	require.NoError(t, err)
-
-	configContent := `
-provider:
-  aistudio:
-    api_key: test-key
-    model: gemini-2.0-flash-exp
-`
-	err = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configContent), 0o644)
-	require.NoError(t, err)
-
-	cfg, err := config.Load()
-	require.NoError(t, err)
-	assertConfigLoaded(t, cfg)
-}
-
-func TestLoad_Defaults(t *testing.T) {
-	_ = setupTestHome(t)
-	cfg, err := config.Load()
-	require.NoError(t, err)
-	assert.Empty(t, cfg.DefaultProvider)
-	assert.Empty(t, cfg.Providers)
-	assert.Equal(t, "confirm", cfg.Mode)
-	assert.Equal(t, "/bin/sh", cfg.Shell)
-}
-
-func TestLoad_EnvVars(t *testing.T) {
+func TestLoadProfile_ExplicitMissingProfileFails(t *testing.T) {
 	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
+	t.Setenv("HOME", tmpDir)
 
-	t.Cleanup(func() {
-		os.Setenv("HOME", origHome)
-		os.Unsetenv("AIDA_MODE")
-	})
-	os.Setenv("HOME", tmpDir)
-	os.Setenv("AIDA_MODE", "quiet")
-
-	cfg, err := config.Load()
+	path, err := config.ResolveConfigPath()
 	require.NoError(t, err)
-	assert.Equal(t, "quiet", cfg.Mode)
-	assert.Equal(t, "/bin/sh", cfg.Shell)
+
+	err = os.MkdirAll(filepath.Dir(path), 0o700)
+	require.NoError(t, err)
+
+	err = os.WriteFile(path, []byte(`runtime:
+  providers:
+    codex:
+      type: codex_acp
+      codex_acp:
+        model: gpt-5.3-codex
+`), 0o600)
+	require.NoError(t, err)
+
+	_, err = config.LoadProfile("missing")
+	require.EqualError(t, err, `top-level profile "missing" not found`)
 }
 
-func TestLoad_SpecificProviderEnvVars(t *testing.T) {
-	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-
-	t.Cleanup(func() {
-		os.Setenv("HOME", origHome)
-		os.Unsetenv("AIDA_PROVIDER_AISTUDIO_API_KEY")
-		os.Unsetenv("AIDA_PROVIDER_AISTUDIO_MODEL")
-	})
-	os.Setenv("HOME", tmpDir)
-	os.Setenv("AIDA_PROVIDER_AISTUDIO_API_KEY", "specific-key")
-	os.Setenv("AIDA_PROVIDER_AISTUDIO_MODEL", "gemini-ultra")
-
-	cfg, err := config.Load()
-	require.NoError(t, err)
-	require.Equal(t, "aistudio", cfg.DefaultProvider)
-	require.Len(t, cfg.Providers, 1)
-
-	provider, ok := cfg.Providers["aistudio"]
-	require.True(t, ok)
-	assert.Equal(t, "specific-key", provider.APIKey)
-	assert.Equal(t, "gemini-ultra", provider.Model)
-}
-
-func TestLoad_EnvAPIKeyDoesNotOverrideModel(t *testing.T) {
-	tmpDir := setupTestHome(t)
-	configDir := filepath.Join(tmpDir, ".config", "aida")
-	err := os.MkdirAll(configDir, 0o755)
-	require.NoError(t, err)
-
-	configContent := `
-[provider.aistudio]
-api_key = "file-key"
-model = "gemini-2.0-flash-exp"
-`
-	err = os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(configContent), 0o644)
-	require.NoError(t, err)
-
-	t.Setenv("AIDA_PROVIDER_AISTUDIO_API_KEY", "env-key")
-
-	cfg, err := config.Load()
-	require.NoError(t, err)
-	require.Equal(t, "aistudio", cfg.DefaultProvider)
-
-	provider, ok := cfg.Providers["aistudio"]
-	require.True(t, ok)
-	assert.Equal(t, "env-key", provider.APIKey)
-	assert.Equal(t, "gemini-2.0-flash-exp", provider.Model)
-}
-
-func TestLoad_Overrides(t *testing.T) {
-	tmpDir := setupTestHome(t)
-	configDir := filepath.Join(tmpDir, ".config", "aida")
-	err := os.MkdirAll(configDir, 0o755)
-	require.NoError(t, err)
-
-	configContent := `
-mode = "confirm"
-shell = "/usr/bin/env bash"
-`
-	err = os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(configContent), 0o644)
-	require.NoError(t, err)
-
-	cfg, err := config.Load()
-	require.NoError(t, err)
-	assert.Equal(t, "confirm", cfg.Mode)
-	assert.Equal(t, "/usr/bin/env bash", cfg.Shell)
-}
-
-func TestSave_New(t *testing.T) {
-	_ = setupTestHome(t)
+func TestConfigRuntimeOverrides(t *testing.T) {
 	cfg := &config.Config{
-		Providers: map[string]config.ProviderConfig{
-			"aistudio": {
-				APIKey: "saved-key",
-				Model:  "gemini-2.0-flash-exp",
-			},
+		Runtime: runtimeConfigWithProviders(),
+		Aida: config.AidaConfig{
+			Provider: "openai",
+			Mode:     "confirm",
+			Shell:    "/bin/sh",
 		},
-		DefaultProvider: "aistudio",
-		Mode:            "confirm",
-		Shell:           "/bin/bash",
 	}
 
-	path, err := config.Save(cfg)
+	err := cfg.SetProviderModel("openai", "gpt-5")
 	require.NoError(t, err)
-	assert.True(t, strings.HasSuffix(path, "config.toml"))
+	err = cfg.SetProviderAPIKey("openai", "test-key")
+	require.NoError(t, err)
 
-	data, err := os.ReadFile(path)
-	require.NoError(t, err)
-	assert.Contains(t, string(data), "api_key")
-	assert.Contains(t, string(data), "saved-key")
+	provider := cfg.Runtime.Providers["openai"]
+	require.Equal(t, "gpt-5", provider.OpenAI.Model)
+	require.Equal(t, "test-key", provider.OpenAI.APIKey)
+
+	err = cfg.SetProviderAPIKey("codex", "bad")
+	require.EqualError(t, err, "--api-key is only supported for openai and aistudio providers")
 }
 
-func TestUpsertProvider_DefaultModel(t *testing.T) {
-	cfg := &config.Config{}
-	cfg.UpsertProvider("aistudio", config.ProviderConfig{
-		APIKey: "test-key",
-	})
+func TestLoadProfile_IgnoresInvalidInactiveProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
 
-	require.Len(t, cfg.Providers, 1)
+	path, err := config.ResolveConfigPath()
+	require.NoError(t, err)
 
-	provider, ok := cfg.Providers["aistudio"]
-	require.True(t, ok)
-	assert.Equal(t, "gemini-2.5-flash", provider.Model)
+	err = os.MkdirAll(filepath.Dir(path), 0o700)
+	require.NoError(t, err)
+
+	err = os.WriteFile(path, []byte(`runtime:
+  providers:
+    codex:
+      type: codex_acp
+      codex_acp:
+        model: gpt-5.3-codex
+    openai:
+      type: openai
+      mcp_servers: [broken]
+      openai:
+        api_key: test-key
+        model: gpt-4o-mini
+  mcp_servers:
+    broken:
+      type: stdio
+aida:
+  provider: codex
+`), 0o600)
+	require.NoError(t, err)
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.NoError(t, cfg.ValidateSelectedRuntime())
 }
 
-func TestSave_OverwriteYAML(t *testing.T) {
-	tmpDir := setupTestHome(t)
-	configDir := filepath.Join(tmpDir, ".config", "aida")
-	err := os.MkdirAll(configDir, 0o700)
+func TestLoadProfile_RejectsMalformedOldInitConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	path, err := config.ResolveConfigPath()
 	require.NoError(t, err)
 
-	yamlPath := filepath.Join(configDir, "config.yaml")
-	err = os.WriteFile(yamlPath, []byte("provider:\n  aistudio:\n    api_key: old-key\n"), 0o600)
+	err = os.MkdirAll(filepath.Dir(path), 0o700)
 	require.NoError(t, err)
 
+	err = os.WriteFile(path, []byte(`runtime:
+  providers:
+    codex:
+      type: codex_acp
+      codexacp:
+        model: gpt-5.3-codex
+aida:
+  provider: codex
+`), 0o600)
+	require.NoError(t, err)
+
+	_, err = config.Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "generated by a buggy version of aida init")
+	require.Contains(t, err.Error(), "rerun `aida init --force`")
+}
+
+func TestValidateSelectedRuntime_SelectedInvalidProviderFails(t *testing.T) {
 	cfg := &config.Config{
-		Providers: map[string]config.ProviderConfig{
-			"aistudio": {
-				APIKey: "yaml-key",
-				Model:  "gemini-pro",
+		Runtime: runtimeconfig.RuntimeConfig{
+			Providers: map[string]agentconfig.Config{
+				"openai": {
+					Type:       agentconfig.AgentTypeOpenAI,
+					MCPServers: []string{"broken"},
+					OpenAI: &agentconfig.LocalAPIConfig{
+						APIKey: "test-key",
+						Model:  "gpt-4o-mini",
+					},
+				},
 			},
 		},
-		DefaultProvider: "aistudio",
-		Mode:            "confirm",
-		Shell:           "/bin/sh",
+		Aida: config.AidaConfig{
+			Provider: "openai",
+		},
 	}
 
-	path, err := config.Save(cfg)
-	require.NoError(t, err)
-	assert.True(t, strings.HasSuffix(path, "config.yaml"))
+	err := cfg.ValidateSelectedRuntime()
+	require.EqualError(t, err, openAIMCPUnsupportedError)
+}
 
-	data, err := os.ReadFile(path)
-	require.NoError(t, err)
-	assert.Contains(t, string(data), "api_key")
-	assert.Contains(t, string(data), "yaml-key")
+func TestValidateSelectedRuntime_SelectedProviderIgnoresInactiveBrokenMCP(t *testing.T) {
+	cfg := &config.Config{
+		Runtime: runtimeconfig.RuntimeConfig{
+			Providers: map[string]agentconfig.Config{
+				"codex": {
+					Type: agentconfig.AgentTypeCodexACP,
+					CodexACP: &agentconfig.ACPConfig{
+						Model: "gpt-5.3-codex",
+					},
+				},
+				"custom": {
+					Type:       agentconfig.AgentTypeGenericACP,
+					MCPServers: []string{"broken"},
+					GenericACP: &agentconfig.ACPConfig{
+						Cmd: []string{"custom-acp"},
+					},
+				},
+			},
+			MCPServers: map[string]agentconfig.MCPServerConfig{
+				"broken": {
+					Type: agentconfig.MCPServerTypeStdio,
+				},
+			},
+		},
+		Aida: config.AidaConfig{
+			Provider: "codex",
+		},
+	}
+
+	require.NoError(t, cfg.ValidateSelectedRuntime())
+}
+
+func TestValidateSelectedRuntime_SelectedPoolValidatesMembers(t *testing.T) {
+	cfg := &config.Config{
+		Runtime: runtimeconfig.RuntimeConfig{
+			Providers: map[string]agentconfig.Config{
+				"pool": {
+					Type: agentconfig.AgentTypePool,
+					PoolConfig: &agentconfig.PoolConfig{
+						Members: []string{"codex", "openai"},
+					},
+				},
+				"codex": {
+					Type: agentconfig.AgentTypeCodexACP,
+					CodexACP: &agentconfig.ACPConfig{
+						Model: "gpt-5.3-codex",
+					},
+				},
+				"openai": {
+					Type:       agentconfig.AgentTypeOpenAI,
+					MCPServers: []string{"broken"},
+					OpenAI: &agentconfig.LocalAPIConfig{
+						APIKey: "test-key",
+						Model:  "gpt-4o-mini",
+					},
+				},
+			},
+		},
+		Aida: config.AidaConfig{
+			Provider: "pool",
+		},
+	}
+
+	err := cfg.ValidateSelectedRuntime()
+	require.EqualError(t, err, openAIMCPUnsupportedError)
+}
+
+func runtimeConfigWithProviders() runtimeconfig.RuntimeConfig {
+	return runtimeconfig.RuntimeConfig{
+		Providers: map[string]agentconfig.Config{
+			"openai": {
+				Type: agentconfig.AgentTypeOpenAI,
+				OpenAI: &agentconfig.LocalAPIConfig{
+					Model: "gpt-4o-mini",
+				},
+			},
+			"codex": {
+				Type: agentconfig.AgentTypeCodexACP,
+				CodexACP: &agentconfig.ACPConfig{
+					Model: "gpt-5.3-codex",
+				},
+			},
+		},
+	}
 }

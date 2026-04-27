@@ -11,13 +11,14 @@ import (
 	"strings"
 
 	"github.com/metalagman/aida/internal/config"
-	"github.com/metalagman/aida/internal/llm"
 	"github.com/metalagman/aida/internal/runner"
+	"github.com/metalagman/aida/internal/runtimeexec"
 	"github.com/spf13/cobra"
 )
 
 type cliOptions struct {
 	provider string
+	profile  string
 	apiKey   string
 	model    string
 	yolo     bool
@@ -49,12 +50,16 @@ func NewRootCmd() *cobra.Command {
 		Short:         "Generate and run a single shell command from a prompt",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Args:          cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			prompt := PromptFromArgs(args, cmd.ArgsLenAtDash())
+			if strings.TrimSpace(prompt) == "" {
+				return cmd.Help()
+			}
+
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 			defer stop()
 
-			cfg, loadErr := config.Load()
+			cfg, loadErr := config.LoadProfile(resolveProfile(opts.profile))
 			if loadErr != nil {
 				return loadErr
 			}
@@ -63,21 +68,20 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
-			provider, err := llm.NewProvider(ctx, cfg)
-			if err != nil {
+			if err := cfg.ValidateSelectedRuntime(); err != nil {
 				return err
 			}
 
 			r := setupRunner(cmd, opts, cfg)
 
-			prompt := PromptFromArgs(args, cmd.ArgsLenAtDash())
-			if strings.TrimSpace(prompt) == "" {
-				return errors.New("prompt is required")
+			prompt = formatPromptWithShell(prompt, cfg.Aida.Shell)
+
+			command, err := runtimeexec.GenerateCommand(ctx, cfg, prompt)
+			if err != nil {
+				return err
 			}
 
-			prompt = formatPromptWithShell(prompt, cfg.Shell)
-
-			if err := r.Run(ctx, prompt, provider); err != nil {
+			if err := r.Run(ctx, command); err != nil {
 				if errors.Is(err, runner.ErrCancelled) {
 					return nil
 				}
@@ -90,13 +94,13 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	setupFlags(cmd, opts)
-	cmd.AddCommand(newProvidersCmd())
+	cmd.AddCommand(newInitCmd())
 
 	return cmd
 }
 
 func setupRunner(cmd *cobra.Command, opts *cliOptions, cfg *config.Config) runner.Runner {
-	mode := runner.RunMode(cfg.Mode)
+	mode := runner.RunMode(cfg.Aida.Mode)
 
 	switch {
 	case opts.dryRun:
@@ -109,7 +113,7 @@ func setupRunner(cmd *cobra.Command, opts *cliOptions, cfg *config.Config) runne
 		mode = runner.ModeConfirm
 	}
 
-	executor := runner.ShellExecutor{Shell: cfg.Shell}
+	executor := runner.ShellExecutor{Shell: cfg.Aida.Shell}
 
 	return runner.Runner{
 		Mode:     mode,
@@ -121,7 +125,8 @@ func setupRunner(cmd *cobra.Command, opts *cliOptions, cfg *config.Config) runne
 }
 
 func setupFlags(cmd *cobra.Command, opts *cliOptions) {
-	cmd.Flags().StringVar(&opts.provider, "provider", "", "LLM provider (aistudio, openai)")
+	cmd.Flags().StringVar(&opts.provider, "provider", "", "provider ID from runtime.providers")
+	cmd.Flags().StringVar(&opts.profile, "profile", "", "config profile name")
 	cmd.Flags().StringVar(&opts.apiKey, "api-key", "", "LLM API key")
 	cmd.Flags().StringVar(&opts.model, "model", "", "LLM model name")
 	cmd.Flags().StringVar(&opts.shell, "shell", "", "Shell executable for running commands")
@@ -165,42 +170,26 @@ func applyOverrides(cfg *config.Config, opts *cliOptions) error {
 	}
 
 	if opts.provider != "" {
-		normalized := normalizeProvider(opts.provider)
-		if normalized == "" {
-			return fmt.Errorf("unsupported provider %q", opts.provider)
+		if err := cfg.SetProvider(opts.provider); err != nil {
+			return err
 		}
-
-		cfg.DefaultProvider = normalized
 	}
 
 	if opts.shell != "" {
-		cfg.Shell = opts.shell
+		cfg.SetShell(opts.shell)
 	}
 
-	if cfg.Shell == "" {
-		cfg.Shell = "/bin/sh"
+	if cfg.Aida.Shell == "" {
+		cfg.Aida.Shell = "/bin/sh"
 	}
 
-	_ = os.Setenv("AIDA_SHELL", cfg.Shell)
+	_ = os.Setenv("AIDA_SHELL", cfg.Aida.Shell)
 
-	providerName := resolveProviderName(cfg, opts)
-
-	if providerName != "" && (opts.apiKey != "" || opts.model != "") {
-		cfg.UpsertProvider(providerName, config.ProviderConfig{
-			APIKey: opts.apiKey,
-			Model:  opts.model,
-		})
-	}
-
-	return nil
+	return applyProviderRuntimeOverrides(cfg, opts)
 }
 
 func resolveProviderName(cfg *config.Config, opts *cliOptions) string {
 	if opts.provider != "" {
-		if normalized := normalizeProvider(opts.provider); normalized != "" {
-			return normalized
-		}
-
 		return opts.provider
 	}
 
@@ -208,15 +197,48 @@ func resolveProviderName(cfg *config.Config, opts *cliOptions) string {
 		return ""
 	}
 
-	if cfg.DefaultProvider != "" {
-		return cfg.DefaultProvider
+	id, _ := cfg.ActiveProviderID()
+
+	return id
+}
+
+func resolveProfile(flagValue string) string {
+	if strings.TrimSpace(flagValue) != "" {
+		return strings.TrimSpace(flagValue)
 	}
 
-	if len(cfg.Providers) > 0 {
-		return config.FirstProviderName(cfg.Providers)
+	return strings.TrimSpace(os.Getenv("AIDA_PROFILE"))
+}
+
+func applyProviderRuntimeOverrides(cfg *config.Config, opts *cliOptions) error {
+	providerName := resolveProviderName(cfg, opts)
+	if providerName == "" {
+		return nil
 	}
 
-	cfg.DefaultProvider = "aistudio"
+	if err := applyProviderModelOverride(cfg, providerName, opts.model); err != nil {
+		return err
+	}
 
-	return cfg.DefaultProvider
+	if err := applyProviderAPIKeyOverride(cfg, providerName, opts.apiKey); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func applyProviderModelOverride(cfg *config.Config, providerName, model string) error {
+	if model == "" {
+		return nil
+	}
+
+	return cfg.SetProviderModel(providerName, model)
+}
+
+func applyProviderAPIKeyOverride(cfg *config.Config, providerName, apiKey string) error {
+	if apiKey == "" {
+		return nil
+	}
+
+	return cfg.SetProviderAPIKey(providerName, apiKey)
 }

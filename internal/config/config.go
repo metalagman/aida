@@ -1,160 +1,31 @@
 package config
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
-	"github.com/pelletier/go-toml/v2"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
+	"github.com/normahq/runtime/agentconfig"
+	runtimeconfig "github.com/normahq/runtime/appconfig"
 )
 
 const (
+	DirPerm  = 0o700
+	FilePerm = 0o600
+
 	ProviderAIStudio = "aistudio"
 	ProviderOpenAI   = "openai"
+
+	defaultProfileName = "default"
 )
 
-const (
-	DirPerm       = 0o700
-	FilePerm      = 0o600
-	envSplitCount = 2
-)
+//go:embed defaults.yaml
+var defaultsYAML []byte
 
-type Config struct {
-	Providers map[string]ProviderConfig `mapstructure:"provider" toml:"provider" yaml:"provider"`
-	//nolint:lll
-	DefaultProvider string `mapstructure:"default_provider" toml:"default_provider" yaml:"default_provider"`
-	Mode            string `mapstructure:"mode"             toml:"mode"             yaml:"mode"`
-	Shell           string `mapstructure:"shell"            toml:"shell"            yaml:"shell"`
-}
-
-type ProviderConfig struct {
-	APIKey string `mapstructure:"api_key" toml:"api_key" yaml:"api_key"`
-	Model  string `mapstructure:"model"   toml:"model"   yaml:"model"`
-}
-
-func Load() (*Config, error) {
-	v := viper.New()
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	configDir := filepath.Join(homeDir, ".config", "aida")
-
-	v.AddConfigPath(configDir)
-	v.SetConfigName("config")
-
-	v.SetEnvPrefix("AIDA")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
-	v.AutomaticEnv()
-
-	// Bind keys so Viper knows to look for them in environment variables
-	_ = v.BindEnv("mode")
-	_ = v.BindEnv("shell")
-	_ = v.BindEnv("default_provider")
-
-	v.SetDefault("mode", "confirm")
-	v.SetDefault("shell", "/bin/sh")
-
-	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("failed to read config file: %w", err)
-		}
-	}
-
-	var cfg Config
-
-	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
-	applyEnvOverrides(&cfg)
-	normalizeProviders(&cfg)
-
-	if cfg.DefaultProvider == "" && len(cfg.Providers) > 0 {
-		cfg.DefaultProvider = FirstProviderName(cfg.Providers)
-	}
-
-	return &cfg, nil
-}
-
-func ResolveConfigPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	configDir := filepath.Join(homeDir, ".config", "aida")
-	tomlPath := filepath.Join(configDir, "config.toml")
-	yamlPath := filepath.Join(configDir, "config.yaml")
-
-	if _, err := os.Stat(tomlPath); err == nil {
-		return tomlPath, nil
-	}
-
-	if _, err := os.Stat(yamlPath); err == nil {
-		return yamlPath, nil
-	}
-
-	return tomlPath, nil
-}
-
-func Save(cfg *Config) (string, error) {
-	if cfg == nil {
-		return "", fmt.Errorf("config is nil")
-	}
-
-	path, err := ResolveConfigPath()
-	if err != nil {
-		return "", err
-	}
-
-	if mkdirErr := os.MkdirAll(filepath.Dir(path), DirPerm); mkdirErr != nil {
-		return "", fmt.Errorf("create config dir: %w", mkdirErr)
-	}
-
-	ext := strings.ToLower(filepath.Ext(path))
-
-	var data []byte
-
-	switch ext {
-	case ".yaml", ".yml":
-		data, err = yaml.Marshal(cfg)
-	default:
-		data, err = toml.Marshal(cfg)
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(path, data, FilePerm); err != nil {
-		return "", fmt.Errorf("write config: %w", err)
-	}
-
-	return path, nil
-}
-
-func NormalizeProviderName(input string) string {
-	normalized := strings.ToLower(strings.TrimSpace(input))
-
-	switch normalized {
-	case ProviderAIStudio, "google", "googleai", "google-ai-studio":
-		return ProviderAIStudio
-	case ProviderOpenAI, "open-ai":
-		return ProviderOpenAI
-	default:
-		return ""
-	}
-}
-
-func DefaultModelForProvider(input string) string {
-	switch NormalizeProviderName(input) {
+func DefaultModelForProvider(providerType string) string {
+	switch NormalizeProviderName(providerType) {
 	case ProviderAIStudio:
 		return "gemini-2.5-flash"
 	case ProviderOpenAI:
@@ -164,237 +35,538 @@ func DefaultModelForProvider(input string) string {
 	}
 }
 
-func (c *Config) ActiveProvider() (string, ProviderConfig, error) {
-	if c == nil {
-		return "", ProviderConfig{}, fmt.Errorf("config is nil")
-	}
-
-	name := NormalizeProviderName(c.DefaultProvider)
-
-	if name == "" && len(c.Providers) > 0 {
-		name = FirstProviderName(c.Providers)
-	}
-
-	if name == "" {
-		return "", ProviderConfig{}, fmt.Errorf("no providers configured")
-	}
-
-	if provider, ok := c.Providers[name]; ok {
-		return name, provider, nil
-	}
-
-	return "", ProviderConfig{}, fmt.Errorf("default provider %q not configured", name)
-}
-
-func (c *Config) FindProvider(name string) (ProviderConfig, bool) {
-	if c == nil {
-		return ProviderConfig{}, false
-	}
-
-	name = NormalizeProviderName(name)
-
-	if name == "" {
-		return ProviderConfig{}, false
-	}
-
-	if provider, ok := c.Providers[name]; ok {
-		return provider, true
-	}
-
-	return ProviderConfig{}, false
-}
-
-func (c *Config) UpsertProvider(name string, provider ProviderConfig) string {
-	if c == nil {
+func NormalizeProviderName(input string) string {
+	switch strings.ToLower(strings.TrimSpace(input)) {
+	case ProviderAIStudio, "google", "googleai", "google-ai-studio":
+		return ProviderAIStudio
+	case ProviderOpenAI, "open-ai":
+		return ProviderOpenAI
+	default:
 		return ""
 	}
-
-	name = NormalizeProviderName(name)
-	if name == "" {
-		return ""
-	}
-
-	if provider.Model == "" {
-		provider.Model = DefaultModelForProvider(name)
-	}
-
-	if c.Providers == nil {
-		c.Providers = make(map[string]ProviderConfig)
-	}
-
-	if existing, ok := c.Providers[name]; ok {
-		if provider.APIKey != "" {
-			existing.APIKey = provider.APIKey
-		}
-
-		if provider.Model != "" {
-			existing.Model = provider.Model
-		}
-
-		c.Providers[name] = existing
-
-		return name
-	}
-
-	c.Providers[name] = provider
-
-	if c.DefaultProvider == "" {
-		c.DefaultProvider = name
-	}
-
-	return name
 }
 
-func RemoveProvider(cfg *Config, name string) bool {
-	if cfg == nil {
-		return false
-	}
-
-	name = NormalizeProviderName(name)
-	if name == "" {
-		return false
-	}
-
-	if _, ok := cfg.Providers[name]; !ok {
-		return false
-	}
-
-	delete(cfg.Providers, name)
-
-	if cfg.DefaultProvider == name {
-		cfg.DefaultProvider = ""
-
-		if len(cfg.Providers) > 0 {
-			cfg.DefaultProvider = FirstProviderName(cfg.Providers)
-		}
-	}
-
-	return true
+type AidaConfig struct {
+	Provider string `mapstructure:"provider" yaml:"provider"`
+	Mode     string `mapstructure:"mode"     yaml:"mode"`
+	Shell    string `mapstructure:"shell"    yaml:"shell"`
 }
 
-func normalizeProviders(cfg *Config) {
-	if cfg == nil {
-		return
+type ProviderConfig struct {
+	APIKey string
+	Model  string
+}
+
+type Config struct {
+	Runtime runtimeconfig.RuntimeConfig `mapstructure:"runtime" yaml:"runtime"`
+	Aida    AidaConfig                  `mapstructure:"aida"    yaml:"aida"`
+	Profile string                      `mapstructure:"-"       yaml:"-"`
+}
+
+func Load() (*Config, error) {
+	return LoadProfile(strings.TrimSpace(os.Getenv("AIDA_PROFILE")))
+}
+
+func LoadProfile(profile string) (*Config, error) {
+	return loadProfile(strings.TrimSpace(profile))
+}
+
+func loadProfile(requestedProfile string) (*Config, error) {
+	path, err := ResolveConfigPath()
+	if err != nil {
+		return nil, err
 	}
 
-	if cfg.Providers == nil {
-		cfg.Providers = make(map[string]ProviderConfig)
+	if _, statErr := os.Stat(path); os.IsNotExist(statErr) {
+		cfg := defaultConfig()
+		cfg.Profile = selectedProfileName(requestedProfile)
 
-		return
+		return cfg, nil
+	} else if statErr != nil {
+		return nil, fmt.Errorf("stat config: %w", statErr)
 	}
 
-	normalized := make(map[string]ProviderConfig)
+	settings, selectedProfile, err := runtimeconfig.LoadResolvedSettings(
+		runtimeconfig.RuntimeLoadOptions{
+			ConfigDir: filepath.Dir(filepath.Dir(path)),
+			Profile:   requestedProfile,
+		},
+		runtimeconfig.AppLoadOptions{
+			AppName:            "aida",
+			DefaultsYAML:       defaultsYAML,
+			UseDotConfigAppDir: true,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
 
-	for name, provider := range cfg.Providers {
-		normalizedName := NormalizeProviderName(name)
-		if normalizedName == "" {
+	if err := validateRequestedProfile(settings, requestedProfile); err != nil {
+		return nil, err
+	}
+
+	if err := detectMalformedInitConfig(settings, path); err != nil {
+		return nil, err
+	}
+
+	cfg := defaultConfig()
+	if err := runtimeconfig.DecodeSettings(settings, cfg); err != nil {
+		return nil, fmt.Errorf("decode config: %w", err)
+	}
+
+	cfg.Profile = selectedProfile
+
+	return cfg, nil
+}
+
+func ResolveConfigPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	return filepath.Join(homeDir, ".config", "aida", "config.yaml"), nil
+}
+
+func EnsureConfigDir() (string, error) {
+	path, err := ResolveConfigPath()
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, DirPerm); err != nil {
+		return "", fmt.Errorf("create config dir: %w", err)
+	}
+
+	return dir, nil
+}
+
+func defaultConfig() *Config {
+	return &Config{
+		Aida: AidaConfig{
+			Mode:  "confirm",
+			Shell: "/bin/sh",
+		},
+	}
+}
+
+func selectedProfileName(requested string) string {
+	if strings.TrimSpace(requested) != "" {
+		return strings.TrimSpace(requested)
+	}
+
+	return defaultProfileName
+}
+
+func validateRequestedProfile(settings map[string]any, requestedProfile string) error {
+	selected := strings.TrimSpace(requestedProfile)
+	if selected == "" {
+		return nil
+	}
+
+	rawProfiles, ok := settings["profiles"]
+	if !ok || rawProfiles == nil {
+		return fmt.Errorf("top-level profile %q not found", selected)
+	}
+
+	return nil
+}
+
+func extractMap(root map[string]any, key string) (map[string]any, bool) {
+	raw, ok := root[key]
+	if !ok {
+		return nil, false
+	}
+
+	m, ok := toStringAnyMap(raw)
+
+	return m, ok
+}
+
+func toStringAnyMap(value any) (map[string]any, bool) {
+	switch typed := value.(type) {
+	case map[string]any:
+		return typed, true
+	case map[any]any:
+		out := make(map[string]any, len(typed))
+		for k, v := range typed {
+			key, ok := k.(string)
+			if !ok {
+				return nil, false
+			}
+
+			out[key] = v
+		}
+
+		return out, true
+	default:
+		return nil, false
+	}
+}
+
+var malformedInitProviderKeys = map[string]struct{}{
+	"mcpservers":         {},
+	"systeminstructions": {},
+	"genericacp":         {},
+	"geminiacp":          {},
+	"codexacp":           {},
+	"opencodeacp":        {},
+	"copilotacp":         {},
+	"claudecodeacp":      {},
+	"extraargs":          {},
+	"apikey":             {},
+	"poolconfig":         {},
+}
+
+func detectMalformedInitConfig(settings map[string]any, path string) error {
+	runtimeSettings, ok := extractMap(settings, "runtime")
+	if !ok {
+		return nil
+	}
+
+	providers, ok := extractMap(runtimeSettings, "providers")
+	if !ok {
+		return nil
+	}
+
+	for providerID, rawProvider := range providers {
+		providerMap, ok := toStringAnyMap(rawProvider)
+		if !ok {
 			continue
 		}
 
-		normalizeSingleProvider(normalized, normalizedName, provider)
+		if key, found := malformedProviderKey(providerMap); found {
+			return fmt.Errorf("config file %q was generated by a buggy version of aida init and uses malformed key %q; "+
+				"rerun `aida init --force` and reapply any local edits or secrets", path, providerID+"."+key)
+		}
 	}
 
-	cfg.Providers = normalized
-
-	if cfg.DefaultProvider != "" {
-		cfg.DefaultProvider = NormalizeProviderName(cfg.DefaultProvider)
-	}
+	return nil
 }
 
-func normalizeSingleProvider(normalized map[string]ProviderConfig, name string, provider ProviderConfig) {
-	if provider.Model == "" {
-		provider.Model = DefaultModelForProvider(name)
-	}
-
-	if existing, ok := normalized[name]; ok {
-		switch {
-		case existing.APIKey == "" && provider.APIKey != "":
-			existing.APIKey = provider.APIKey
-		case existing.Model == "" && provider.Model != "":
-			existing.Model = provider.Model
+func malformedProviderKey(provider map[string]any) (string, bool) {
+	for key, value := range provider {
+		if _, ok := malformedInitProviderKeys[key]; ok {
+			return key, true
 		}
 
-		normalized[name] = existing
-	} else {
-		normalized[name] = provider
+		nested, ok := toStringAnyMap(value)
+		if !ok {
+			continue
+		}
+
+		if nestedKey, found := malformedProviderKey(nested); found {
+			return nestedKey, true
+		}
 	}
+
+	return "", false
 }
 
-func applyEnvOverrides(cfg *Config) {
-	if cfg == nil {
+func (c *Config) ActiveProviderID() (string, error) {
+	if c == nil {
+		return "", fmt.Errorf("config is nil")
+	}
+
+	id := strings.TrimSpace(c.Aida.Provider)
+	if id == "" {
+		return "", fmt.Errorf("aida.provider is required")
+	}
+
+	if _, ok := c.Runtime.Providers[id]; !ok {
+		return "", fmt.Errorf("provider %q is not defined in runtime.providers", id)
+	}
+
+	return id, nil
+}
+
+func (c *Config) ProviderConfig(id string) (agentconfig.Config, error) {
+	if c == nil {
+		return agentconfig.Config{}, fmt.Errorf("config is nil")
+	}
+
+	cfg, ok := c.Runtime.Providers[strings.TrimSpace(id)]
+	if !ok {
+		return agentconfig.Config{}, fmt.Errorf("provider %q is not defined in runtime.providers", id)
+	}
+
+	return cfg, nil
+}
+
+func (c *Config) ValidateSelectedRuntime() error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
+
+	providerID, err := c.ActiveProviderID()
+	if err != nil {
+		return err
+	}
+
+	state := runtimeValidationState{
+		validatedProviders: map[string]bool{},
+		validatedMCP:       map[string]bool{},
+	}
+
+	return c.validateProviderScope(providerID, state, false)
+}
+
+func (c *Config) SetProvider(id string) error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return fmt.Errorf("provider id is required")
+	}
+
+	if _, ok := c.Runtime.Providers[id]; !ok {
+		return fmt.Errorf("provider %q is not defined in runtime.providers", id)
+	}
+
+	c.Aida.Provider = id
+
+	return nil
+}
+
+func (c *Config) SetShell(shell string) {
+	if c == nil {
 		return
 	}
 
-	// 1. Specific provider overrides (AIDA_PROVIDER_<NAME>_API_KEY / AIDA_PROVIDER_<NAME>_MODEL)
-	applySpecificProviderEnvOverrides(cfg)
-
-	// 2. Default provider override
-	if cfg.DefaultProvider == "" {
-		// Viper should have already handled AIDA_DEFAULT_PROVIDER via BindEnv
-		// But if it's still empty, we fallback to our logic.
+	shell = strings.TrimSpace(shell)
+	if shell == "" {
+		return
 	}
 
-	cfg.DefaultProvider = NormalizeProviderName(cfg.DefaultProvider)
+	c.Aida.Shell = shell
 }
 
-func applySpecificProviderEnvOverrides(cfg *Config) {
-	prefix := "AIDA_PROVIDER_"
+func (c *Config) SetProviderModel(id, model string) error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
 
-	for _, env := range os.Environ() {
-		if !strings.HasPrefix(env, prefix) {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return nil
+	}
+
+	provider, ok := c.Runtime.Providers[id]
+	if !ok {
+		return fmt.Errorf("provider %q is not defined in runtime.providers", id)
+	}
+
+	if provider.Type == agentconfig.AgentTypePool {
+		return fmt.Errorf("--model is not supported for pool provider %q", id)
+	}
+
+	if err := setProviderModel(&provider, id, model); err != nil {
+		return err
+	}
+
+	c.Runtime.Providers[id] = provider
+
+	return nil
+}
+
+func setProviderModel(provider *agentconfig.Config, id, model string) error {
+	if updated, err := setLocalAPIProviderModel(provider, model); updated || err != nil {
+		return err
+	}
+
+	if updated, err := setACPProviderModel(provider, id, model); updated || err != nil {
+		return err
+	}
+
+	return fmt.Errorf("unsupported provider type %q", provider.Type)
+}
+
+func setLocalAPIProviderModel(provider *agentconfig.Config, model string) (bool, error) {
+	switch provider.Type {
+	case agentconfig.AgentTypeOpenAI:
+		if provider.OpenAI == nil {
+			provider.OpenAI = &agentconfig.LocalAPIConfig{}
+		}
+
+		provider.OpenAI.Model = model
+
+		return true, nil
+	case agentconfig.AgentTypeAIStudio:
+		if provider.AIStudio == nil {
+			provider.AIStudio = &agentconfig.LocalAPIConfig{}
+		}
+
+		provider.AIStudio.Model = model
+
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func setACPProviderModel(provider *agentconfig.Config, id, model string) (bool, error) {
+	blockName, block, ok := acpProviderModelBlock(provider)
+	if !ok {
+		return false, nil
+	}
+
+	if block == nil {
+		return true, fmt.Errorf("%s block is required for provider %q", blockName, id)
+	}
+
+	block.Model = model
+
+	return true, nil
+}
+
+func acpProviderModelBlock(provider *agentconfig.Config) (string, *agentconfig.ACPConfig, bool) {
+	switch provider.Type {
+	case agentconfig.AgentTypeGenericACP:
+		return "generic_acp", provider.GenericACP, true
+	case agentconfig.AgentTypeGeminiACP:
+		return "gemini_acp", provider.GeminiACP, true
+	case agentconfig.AgentTypeCodexACP:
+		return "codex_acp", provider.CodexACP, true
+	case agentconfig.AgentTypeOpenCodeACP:
+		return "opencode_acp", provider.OpenCodeACP, true
+	case agentconfig.AgentTypeCopilotACP:
+		return "copilot_acp", provider.CopilotACP, true
+	case agentconfig.AgentTypeClaudeCodeACP:
+		return "claude_code_acp", provider.ClaudeCodeACP, true
+	default:
+		return "", nil, false
+	}
+}
+
+func (c *Config) SetProviderAPIKey(id, apiKey string) error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
+
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		return nil
+	}
+
+	provider, ok := c.Runtime.Providers[id]
+	if !ok {
+		return fmt.Errorf("provider %q is not defined in runtime.providers", id)
+	}
+
+	switch provider.Type {
+	case agentconfig.AgentTypeOpenAI:
+		if provider.OpenAI == nil {
+			provider.OpenAI = &agentconfig.LocalAPIConfig{}
+		}
+
+		provider.OpenAI.APIKey = apiKey
+	case agentconfig.AgentTypeAIStudio:
+		if provider.AIStudio == nil {
+			provider.AIStudio = &agentconfig.LocalAPIConfig{}
+		}
+
+		provider.AIStudio.APIKey = apiKey
+	default:
+		return fmt.Errorf("--api-key is only supported for openai and aistudio providers")
+	}
+
+	c.Runtime.Providers[id] = provider
+
+	return nil
+}
+
+type runtimeValidationState struct {
+	validatedProviders map[string]bool
+	validatedMCP       map[string]bool
+}
+
+func (c *Config) validateProviderScope(id string, state runtimeValidationState, nestedPoolMember bool) error {
+	if state.validatedProviders[id] {
+		return nil
+	}
+
+	provider, err := c.ProviderConfig(id)
+	if err != nil {
+		return err
+	}
+
+	if nestedPoolMember && agentconfig.IsPoolType(provider.Type) {
+		return fmt.Errorf("provider %q: pool cannot contain nested pool %q", c.Aida.Provider, id)
+	}
+
+	if err := provider.Validate(); err != nil {
+		return fmt.Errorf("provider %q: %w", id, err)
+	}
+
+	state.validatedProviders[id] = true
+
+	if err := c.validateProviderMCPServers(id, provider, state); err != nil {
+		return err
+	}
+
+	if !agentconfig.IsPoolType(provider.Type) {
+		return nil
+	}
+
+	return c.validatePoolMembers(id, provider, state)
+}
+
+func (c *Config) validateProviderMCPServers(
+	id string,
+	provider agentconfig.Config,
+	state runtimeValidationState,
+) error {
+	for _, serverID := range provider.MCPServers {
+		serverID = strings.TrimSpace(serverID)
+		if serverID == "" {
 			continue
 		}
 
-		parts := strings.SplitN(env, "=", envSplitCount)
-		if len(parts) != envSplitCount {
+		if state.validatedMCP[serverID] {
 			continue
 		}
 
-		key := parts[0]
-		value := parts[1]
-		remaining := strings.TrimPrefix(key, prefix)
-
-		switch {
-		case strings.HasSuffix(remaining, "_API_KEY"):
-			name := NormalizeProviderName(strings.TrimSuffix(remaining, "_API_KEY"))
-			if name == "" {
-				continue
-			}
-
-			if provider, ok := cfg.Providers[name]; ok {
-				provider.APIKey = value
-				cfg.Providers[name] = provider
-			} else {
-				cfg.UpsertProvider(name, ProviderConfig{APIKey: value})
-			}
-		case strings.HasSuffix(remaining, "_MODEL"):
-			name := NormalizeProviderName(strings.TrimSuffix(remaining, "_MODEL"))
-			if name == "" {
-				continue
-			}
-
-			if provider, ok := cfg.Providers[name]; ok {
-				provider.Model = value
-				cfg.Providers[name] = provider
-			} else {
-				cfg.UpsertProvider(name, ProviderConfig{Model: value})
-			}
+		serverCfg, ok := c.Runtime.MCPServers[serverID]
+		if !ok {
+			return fmt.Errorf("provider %q: references unknown mcp server %q", id, serverID)
 		}
+
+		if err := agentconfig.ValidateMCPServerConfig(serverCfg); err != nil {
+			return fmt.Errorf("provider %q: mcp %q: %w", id, serverID, err)
+		}
+
+		state.validatedMCP[serverID] = true
 	}
+
+	return nil
 }
 
-func FirstProviderName(providers map[string]ProviderConfig) string {
-	if len(providers) == 0 {
-		return ""
+func (c *Config) validatePoolMembers(id string, provider agentconfig.Config, state runtimeValidationState) error {
+	if provider.PoolConfig == nil {
+		return fmt.Errorf("provider %q: pool block is required", id)
 	}
 
-	keys := make([]string, 0, len(providers))
+	for _, memberID := range provider.PoolConfig.Members {
+		memberID = strings.TrimSpace(memberID)
+		if memberID == "" {
+			continue
+		}
 
-	for key := range providers {
-		keys = append(keys, key)
+		if memberID == id {
+			return fmt.Errorf("provider %q: pool cannot reference itself", id)
+		}
+
+		if _, ok := c.Runtime.Providers[memberID]; !ok {
+			return fmt.Errorf("provider %q: pool references unknown agent %q", id, memberID)
+		}
+
+		if err := c.validateProviderScope(memberID, state, true); err != nil {
+			return err
+		}
 	}
 
-	sort.Strings(keys)
-
-	return keys[0]
+	return nil
 }

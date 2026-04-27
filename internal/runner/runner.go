@@ -12,10 +12,6 @@ import (
 
 var ErrCancelled = errors.New("command canceled")
 
-type CommandGenerator interface {
-	GenerateCommand(ctx context.Context, prompt string) (string, error)
-}
-
 type Executor interface {
 	Execute(ctx context.Context, command string, stdout, stderr io.Writer, stdin io.Reader) error
 }
@@ -56,12 +52,7 @@ type Runner struct {
 	Executor Executor
 }
 
-func (r Runner) Run(ctx context.Context, prompt string, provider CommandGenerator) error {
-	command, err := provider.GenerateCommand(ctx, prompt)
-	if err != nil {
-		return fmt.Errorf("generate command: %w", err)
-	}
-
+func (r Runner) Run(ctx context.Context, command string) error {
 	command = strings.TrimSpace(command)
 	if command == "" {
 		return errors.New("empty command generated")

@@ -14,19 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type fakeProvider struct {
-	command string
-	err     error
-}
-
-func (p fakeProvider) GenerateCommand(ctx context.Context, _ string) (string, error) {
-	if p.err != nil {
-		return "", p.err
-	}
-
-	return p.command, nil
-}
-
 type fakeExecutor struct {
 	called  bool
 	command string
@@ -67,7 +54,7 @@ func TestRunnerConfirmContextCancel(t *testing.T) {
 		cancel()
 	}()
 
-	err := r.Run(ctx, "list files", fakeProvider{command: "ls"})
+	err := r.Run(ctx, "ls")
 
 	assert.ErrorIs(t, err, runner.ErrCancelled)
 	assert.False(t, exec.called)
@@ -84,7 +71,7 @@ func TestRunnerConfirmYes(t *testing.T) {
 		Executor: exec,
 	}
 
-	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls -la"})
+	err := r.Run(context.Background(), "ls -la")
 
 	require.NoError(t, err)
 
@@ -108,7 +95,7 @@ func TestRunnerConfirmNo(t *testing.T) {
 		Executor: exec,
 	}
 
-	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls"})
+	err := r.Run(context.Background(), "ls")
 	assert.ErrorIs(t, err, runner.ErrCancelled)
 	assert.False(t, exec.called)
 	assert.Contains(t, stdout.String(), "Canceled.")
@@ -125,7 +112,7 @@ func TestRunnerYOLO(t *testing.T) {
 		Executor: exec,
 	}
 
-	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls"})
+	err := r.Run(context.Background(), "ls")
 	require.NoError(t, err)
 	assert.True(t, exec.called)
 	assert.Contains(t, stdout.String(), "Running: \x1b[36m`ls`\x1b[0m")
@@ -133,7 +120,7 @@ func TestRunnerYOLO(t *testing.T) {
 
 func TestRunnerEmptyCommand(t *testing.T) {
 	r := runner.Runner{Mode: runner.ModeConfirm}
-	err := r.Run(context.Background(), "noop", fakeProvider{command: " "})
+	err := r.Run(context.Background(), " ")
 	assert.Error(t, err)
 }
 
@@ -148,7 +135,7 @@ func TestRunnerUnableToRunLocal(t *testing.T) {
 		Executor: exec,
 	}
 
-	err := r.Run(context.Background(), "nope", fakeProvider{command: "UNABLE_TO_RUN_LOCAL"})
+	err := r.Run(context.Background(), "UNABLE_TO_RUN_LOCAL")
 	assert.ErrorIs(t, err, runner.ErrCancelled)
 	assert.False(t, exec.called)
 	assert.Contains(t, stdout.String(), "Unable to process the request locally")
@@ -165,7 +152,7 @@ func TestRunnerQuietSuppressesCommandOutput(t *testing.T) {
 		Executor: exec,
 	}
 
-	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls -la"})
+	err := r.Run(context.Background(), "ls -la")
 	require.NoError(t, err)
 	assert.Equal(t, "", stdout.String())
 	assert.True(t, exec.called)
@@ -182,7 +169,7 @@ func TestRunnerDryRunOutputsOnlyCommand(t *testing.T) {
 		Executor: exec,
 	}
 
-	err := r.Run(context.Background(), "list files", fakeProvider{command: "ls -la"})
+	err := r.Run(context.Background(), "ls -la")
 	require.NoError(t, err)
 	assert.Equal(t, "ls -la\n", stdout.String())
 	assert.False(t, exec.called)

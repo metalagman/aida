@@ -1,0 +1,7 @@
+runtime:
+  providers: {}
+  mcp_servers: {}
+aida:
+  provider: ""
+  mode: confirm
+  shell: /bin/sh

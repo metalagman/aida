@@ -48,6 +48,21 @@ tasks:
     cmds:
       - CGO_ENABLED=1 go test -v -race -coverprofile=coverage.out ./...
 
+  test:integration:
+    desc: Run opt-in Codex ACP integration tests
+    cmds:
+      - AIDA_RUN_ACP_INTEGRATION=1 go test -tags='integration codex' -v ./internal/runtimeexec
+
+  test:integration:opencode:
+    desc: Run opt-in OpenCode ACP integration tests
+    cmds:
+      - AIDA_RUN_ACP_INTEGRATION=1 go test -tags='integration opencode' -v ./internal/runtimeexec
+
+  test:integration:gemini:
+    desc: Run opt-in Gemini ACP integration tests
+    cmds:
+      - AIDA_RUN_ACP_INTEGRATION=1 go test -tags='integration gemini' -v ./internal/runtimeexec
+
   test:coverage:
     desc: Run tests with coverage report
     cmds:
