@@ -28,6 +28,20 @@ func (e *fakeExecutor) Execute(_ context.Context, command string, stdout, _ io.W
 	return nil
 }
 
+type blockingReadCloser struct {
+	release <-chan struct{}
+}
+
+func (r blockingReadCloser) Read([]byte) (int, error) {
+	<-r.release
+
+	return 0, io.EOF
+}
+
+func (r blockingReadCloser) Close() error {
+	return nil
+}
+
 func TestRunnerConfirmContextCancel(t *testing.T) {
 	var stdout bytes.Buffer
 
@@ -61,6 +75,39 @@ func TestRunnerConfirmContextCancel(t *testing.T) {
 
 	if exec.called {
 		t.Fatal("Run() unexpectedly executed command after cancellation")
+	}
+}
+
+func TestRunnerConfirmContextCancelDoesNotWaitForPromptRead(t *testing.T) {
+	release := make(chan struct{})
+	defer close(release)
+
+	var stdout bytes.Buffer
+
+	r := runner.Runner{
+		Mode:     runner.ModeConfirm,
+		Stdout:   &stdout,
+		PromptIn: blockingReadCloser{release: release},
+		ExecIn:   strings.NewReader(""),
+		Executor: &fakeExecutor{},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan error, 1)
+
+	go func() {
+		done <- r.Run(ctx, "ls")
+	}()
+
+	select {
+	case err := <-done:
+		if err != runner.ErrCancelled {
+			t.Fatalf("Run() error = %v, want %v", err, runner.ErrCancelled)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Run() blocked waiting for prompt read after context cancellation")
 	}
 }
 

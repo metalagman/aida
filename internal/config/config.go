@@ -12,19 +12,25 @@ import (
 )
 
 const (
-	DirPerm  = 0o700
+	// DirPerm is the permission used for Aida-owned config directories.
+	DirPerm = 0o700
+	// FilePerm is the permission used for Aida-owned config files.
 	FilePerm = 0o600
 
+	// ProviderAIStudio is the local API-backed Google AI Studio provider type.
 	ProviderAIStudio = "aistudio"
-	ProviderOpenAI   = "openai"
-	EnvAIDAProvider  = "AIDA_PROVIDER"
+	// ProviderOpenAI is the local API-backed OpenAI provider type.
+	ProviderOpenAI = "openai"
 
+	envAIDAProvider    = "AIDA_PROVIDER"
 	defaultProfileName = "default"
 )
 
 //go:embed defaults.yaml
 var defaultsYAML []byte
 
+// DefaultModelForProvider returns Aida's default model for supported local API
+// provider types.
 func DefaultModelForProvider(providerType string) string {
 	switch NormalizeProviderName(providerType) {
 	case ProviderAIStudio:
@@ -36,6 +42,7 @@ func DefaultModelForProvider(providerType string) string {
 	}
 }
 
+// NormalizeProviderName maps user-facing provider aliases to Aida provider IDs.
 func NormalizeProviderName(input string) string {
 	switch strings.ToLower(strings.TrimSpace(input)) {
 	case ProviderAIStudio, "google", "googleai", "google-ai-studio":
@@ -47,27 +54,32 @@ func NormalizeProviderName(input string) string {
 	}
 }
 
+// AidaConfig contains Aida-specific settings outside the shared runtime config.
 type AidaConfig struct {
 	Provider string `mapstructure:"provider" yaml:"provider"`
 	Mode     string `mapstructure:"mode"     yaml:"mode"`
 	Shell    string `mapstructure:"shell"    yaml:"shell"`
 }
 
+// ProviderConfig contains local API provider credentials and model settings.
 type ProviderConfig struct {
 	APIKey string
 	Model  string
 }
 
+// Config is the fully resolved Aida configuration.
 type Config struct {
 	Runtime runtimeconfig.RuntimeConfig `mapstructure:"runtime" yaml:"runtime"`
 	Aida    AidaConfig                  `mapstructure:"aida"    yaml:"aida"`
 	Profile string                      `mapstructure:"-"       yaml:"-"`
 }
 
+// Load loads the default config profile selected by AIDA_PROFILE.
 func Load() (*Config, error) {
 	return LoadProfile(strings.TrimSpace(os.Getenv("AIDA_PROFILE")))
 }
 
+// LoadProfile loads config with the named profile overlay applied.
 func LoadProfile(profile string) (*Config, error) {
 	return loadProfile(strings.TrimSpace(profile))
 }
@@ -124,6 +136,7 @@ func loadProfile(requestedProfile string) (*Config, error) {
 	return cfg, nil
 }
 
+// ResolveConfigPath returns the canonical Aida config file path.
 func ResolveConfigPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -133,6 +146,7 @@ func ResolveConfigPath() (string, error) {
 	return filepath.Join(homeDir, ".config", "aida", "config.yaml"), nil
 }
 
+// EnsureConfigDir creates the canonical Aida config directory if necessary.
 func EnsureConfigDir() (string, error) {
 	path, err := ResolveConfigPath()
 	if err != nil {
@@ -270,13 +284,17 @@ func malformedProviderKey(provider map[string]any) (string, bool) {
 }
 
 func validateUnsupportedEnvOverrides() error {
-	if value, ok := os.LookupEnv(EnvAIDAProvider); ok && strings.TrimSpace(value) != "" {
-		return fmt.Errorf("%s is not supported; use AIDA_PROFILE or config profiles instead", EnvAIDAProvider)
+	if value, ok := os.LookupEnv(envAIDAProvider); ok && strings.TrimSpace(value) != "" {
+		return fmt.Errorf(
+			"environment variable %s is not supported; use AIDA_PROFILE or config profiles instead",
+			envAIDAProvider,
+		)
 	}
 
 	return nil
 }
 
+// ActiveProviderID returns the selected provider ID after config resolution.
 func (c *Config) ActiveProviderID() (string, error) {
 	if c == nil {
 		return "", fmt.Errorf("config is nil")
@@ -294,6 +312,7 @@ func (c *Config) ActiveProviderID() (string, error) {
 	return id, nil
 }
 
+// ProviderConfig returns the config for a provider ID.
 func (c *Config) ProviderConfig(id string) (agentconfig.Config, error) {
 	if c == nil {
 		return agentconfig.Config{}, fmt.Errorf("config is nil")
@@ -307,6 +326,7 @@ func (c *Config) ProviderConfig(id string) (agentconfig.Config, error) {
 	return cfg, nil
 }
 
+// ValidateSelectedRuntime validates the selected provider and its dependencies.
 func (c *Config) ValidateSelectedRuntime() error {
 	if c == nil {
 		return fmt.Errorf("config is nil")
@@ -325,6 +345,7 @@ func (c *Config) ValidateSelectedRuntime() error {
 	return c.validateProviderScope(providerID, state, false)
 }
 
+// SetShell applies a non-empty shell override.
 func (c *Config) SetShell(shell string) {
 	if c == nil {
 		return
@@ -338,6 +359,7 @@ func (c *Config) SetShell(shell string) {
 	c.Aida.Shell = shell
 }
 
+// SetProviderModel applies a non-empty model override to a configured provider.
 func (c *Config) SetProviderModel(id, model string) error {
 	if c == nil {
 		return fmt.Errorf("config is nil")

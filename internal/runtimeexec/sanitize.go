@@ -15,6 +15,8 @@ var rejectedOutputPrefixes = []string{
 	"you can run",
 }
 
+// NormalizeCommand extracts a single executable shell command from provider
+// output and rejects prose or multi-line responses.
 func NormalizeCommand(input string) (string, error) {
 	trimmed := strings.TrimSpace(input)
 	if trimmed == "" {

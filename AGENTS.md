@@ -33,7 +33,7 @@
 2. For new features, update AGENTS.md with new requirements before implementation.
 3. Draft implementation: minimal code to satisfy the requirement.
 4. Update AGENTS.md with latest changes to envs, args, and related behavior.
-5. Lint & static analysis: `go tool golangci-lint run` (or project task).
+5. Lint & static analysis: `task lint` or `golangci-lint run --timeout 5m`.
 6. Verify with tests: `go test ./...` and `go test -race ./...`. Run the provider-specific ACP integration tasks when local auth is available.
 7. Refactor & optimize: clean up to senior standards.
 8. Repeat steps 3-7 as needed until clean.

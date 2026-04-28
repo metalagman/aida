@@ -10,16 +10,20 @@ import (
 	"strings"
 )
 
+// ErrCancelled reports that command execution was intentionally canceled.
 var ErrCancelled = errors.New("command canceled")
 
+// Executor runs a shell command.
 type Executor interface {
 	Execute(ctx context.Context, command string, stdout, stderr io.Writer, stdin io.Reader) error
 }
 
+// ShellExecutor runs commands through a configured shell.
 type ShellExecutor struct {
 	Shell string
 }
 
+// Execute runs command through the configured shell.
 func (e ShellExecutor) Execute(ctx context.Context, command string, stdout, stderr io.Writer, stdin io.Reader) error {
 	shell := e.Shell
 	if shell == "" {
@@ -35,15 +39,21 @@ func (e ShellExecutor) Execute(ctx context.Context, command string, stdout, stde
 	return cmd.Run()
 }
 
+// RunMode controls whether and how a generated command is executed.
 type RunMode string
 
 const (
-	ModeYOLO    RunMode = "yolo"
+	// ModeYOLO runs commands without confirmation.
+	ModeYOLO RunMode = "yolo"
+	// ModeConfirm prompts before running commands.
 	ModeConfirm RunMode = "confirm"
-	ModeQuiet   RunMode = "quiet"
-	ModeDryRun  RunMode = "dry-run"
+	// ModeQuiet runs commands without Aida output.
+	ModeQuiet RunMode = "quiet"
+	// ModeDryRun prints commands without running them.
+	ModeDryRun RunMode = "dry-run"
 )
 
+// Runner executes generated shell commands according to its run mode.
 type Runner struct {
 	Mode     RunMode
 	Stdout   io.Writer
@@ -53,6 +63,7 @@ type Runner struct {
 	Executor Executor
 }
 
+// Run executes or prints command according to the runner mode.
 func (r Runner) Run(ctx context.Context, command string) error {
 	command = strings.TrimSpace(command)
 	if command == "" {
@@ -120,11 +131,10 @@ func (r Runner) confirm(ctx context.Context, command string) error {
 	select {
 	case <-ctx.Done():
 		_ = promptIn.Close()
-
-		<-done
-
 		_, _ = fmt.Fprintln(r.Stdout)
 
+		// Some injected readers do not unblock on Close. Do not wait here; the
+		// buffered channel lets the reader goroutine exit later if Read returns.
 		return ErrCancelled
 	case res := <-done:
 		if res.err != nil && !errors.Is(res.err, io.EOF) {

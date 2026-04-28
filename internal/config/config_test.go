@@ -122,15 +122,17 @@ func TestConfigRuntimeOverrides(t *testing.T) {
 }
 
 func TestLoadProfileRejectsAIDAProviderEnvOverride(t *testing.T) {
+	const envAIDAProvider = "AIDA_PROVIDER"
+
 	t.Setenv("HOME", t.TempDir())
-	t.Setenv(config.EnvAIDAProvider, "openai")
+	t.Setenv(envAIDAProvider, "openai")
 
 	_, err := config.Load()
 	if err == nil {
 		t.Fatal("config.Load() error = nil, want unsupported env override error")
 	}
 
-	want := "AIDA_PROVIDER is not supported; use AIDA_PROFILE or config profiles instead"
+	want := "environment variable AIDA_PROVIDER is not supported; use AIDA_PROFILE or config profiles instead"
 	if err.Error() != want {
 		t.Fatalf("config.Load() error = %q, want %q", err.Error(), want)
 	}

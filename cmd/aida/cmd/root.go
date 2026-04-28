@@ -204,13 +204,5 @@ func applyProviderRuntimeOverrides(cfg *config.Config, opts *cliOptions) error {
 		return err
 	}
 
-	return applyProviderModelOverride(cfg, providerName, opts.model)
-}
-
-func applyProviderModelOverride(cfg *config.Config, providerName, model string) error {
-	if model == "" {
-		return nil
-	}
-
-	return cfg.SetProviderModel(providerName, model)
+	return cfg.SetProviderModel(providerName, opts.model)
 }
