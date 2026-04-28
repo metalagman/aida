@@ -6,8 +6,6 @@
 [![version](https://img.shields.io/github/v/release/metalagman/aida?sort=semver)](https://github.com/metalagman/aida/releases)
 [![license](https://img.shields.io/github/license/metalagman/aida)](LICENSE)
 
-![aida logo](./docs/assets/logo.png)
-
 Turn popular CLI agents into a one-shot shell command runner.
 
 `aida` (айда) works with `Codex`, `OpenCode`, `Gemini`, `Copilot`, and `Claude Code` to generate terminal commands, then runs them with `confirm` mode by default so you stay in control.
