@@ -9,7 +9,7 @@
 - Config location: `~/.config/aida/config.yaml`.
 - Config format: relay-style YAML with top-level `runtime`, `aida`, and `profiles`.
 - Provider runtime: ACP agents are top priority; local API-backed provider types `openai` and `aistudio` are supported through the shared `github.com/normahq/runtime` provider registry.
-- Bootstrap command: `aida init` generates a live ACP-only config from detected ACP providers plus a full commented canonical reference block.
+- Bootstrap command: `aida init` generates a live ACP-only config from detected ACP providers, matching provider-named profiles, and a full commented canonical reference block.
 - Provider management: do not add `aida providers` commands; config is managed by `aida init` and direct YAML edits.
 - Profile selection: support `--profile` and `AIDA_PROFILE`.
 - Runtime selection: use `aida.provider` in config and `profiles.*.aida.provider`; do not support `--provider` or `AIDA_PROVIDER`.

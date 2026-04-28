@@ -96,18 +96,11 @@ func buildInitConfig() (string, error) {
 			Mode:  "confirm",
 			Shell: "/bin/sh",
 		},
-		Profiles: map[string]profileDoc{
-			"default": {
-				Aida: config.AidaConfig{},
-			},
-		},
+		Profiles: buildInitProfiles(detected),
 	}
 
 	if len(detected) > 0 {
 		doc.Aida.Provider = detected[0].ID
-		doc.Profiles["default"] = profileDoc{
-			Aida: config.AidaConfig{Provider: detected[0].ID},
-		}
 	}
 
 	data, err := yaml.Marshal(doc)
@@ -147,6 +140,34 @@ func buildInitProviders(detected []detectedProvider) map[string]agentconfig.Conf
 	}
 
 	return providers
+}
+
+func buildInitProfiles(detected []detectedProvider) map[string]profileDoc {
+	profiles := map[string]profileDoc{
+		"default": {
+			Aida: config.AidaConfig{},
+		},
+	}
+
+	if len(detected) == 0 {
+		return profiles
+	}
+
+	profiles["default"] = profileDoc{
+		Aida: config.AidaConfig{Provider: detected[0].ID},
+	}
+
+	for _, provider := range detected {
+		if _, ok := detectedProviderConfig(provider); !ok {
+			continue
+		}
+
+		profiles[provider.ID] = profileDoc{
+			Aida: config.AidaConfig{Provider: provider.ID},
+		}
+	}
+
+	return profiles
 }
 
 func detectedProviderConfig(provider detectedProvider) (agentconfig.Config, bool) {
@@ -259,6 +280,9 @@ const initReferenceComment = `# ------------------------------------------------
 #   shell: /bin/sh
 # profiles:
 #   default:
+#     aida:
+#       provider: codex
+#   codex:
 #     aida:
 #       provider: codex
 #   api:
