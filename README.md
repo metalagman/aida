@@ -22,12 +22,17 @@ aida -- list the largest files in this repo
 
 `aida init` writes `~/.config/aida/config.yaml` with detected ACP providers in the live config and a full commented reference block for ACP, pool, and API-backed provider shapes.
 
-## Requirements
+## Runtime Options
 
-- Go 1.25+
-- `golangci-lint` v2.8.0+ (Taskfile has `lint:install`)
-- Uses Google ADK and `google.golang.org/genai`.
-- ACP-compatible CLIs are the preferred runtime path.
+ACP-compatible CLIs are the preferred runtime path. If one of the supported ACP clients is already installed and available in `PATH`, `aida init` will detect it and write a working provider entry for you.
+
+If you want to use an API-backed provider instead, edit `~/.config/aida/config.yaml` after `aida init` and configure one of these provider types:
+
+- `openai`
+- `aistudio`
+
+API key setup:
+
 - Gemini API keys: https://aistudio.google.com/api-keys
 - OpenAI API keys: https://platform.openai.com/api-keys
 
@@ -39,23 +44,7 @@ Install from npm:
 npm install -g @metalagman/aida
 ```
 
-Initialize the canonical config file:
-
-```bash
-aida init
-```
-
-If no ACP CLI is detected in `PATH`, set `aida.provider` manually after init.
-
-To rewrite an existing config:
-
-```bash
-aida init --force
-```
-
-### Alternative Installation
-
-Manual binary install from the latest GitHub release:
+Or install a release binary:
 
 ```bash
 curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-linux-amd64
@@ -63,33 +52,36 @@ chmod +x /usr/local/bin/aida
 ```
 
 macOS (Apple Silicon):
+
 ```bash
 curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-darwin-arm64
 chmod +x /usr/local/bin/aida
 ```
 
 Linux (arm64):
+
 ```bash
 curl -L -o /usr/local/bin/aida https://github.com/metalagman/aida/releases/latest/download/aida-linux-arm64
 chmod +x /usr/local/bin/aida
 ```
 
-Replace the URL with the appropriate artifact from:
+See the latest release artifacts at:
 https://github.com/metalagman/aida/releases/latest
 
 ## Usage
 
-Generate and run a command (defaults to `confirm` mode):
+Generate and run a command:
 
 ```bash
 aida -- find all files in current directory and change end lines from crlf to lf
 ```
 
 Execution modes:
-- `confirm` (Default): Displays the generated command and prompts for confirmation before execution.
-- `--yolo`: Prints "Running: <command>..." and executes it immediately without prompting.
-- `--quiet`: Runs the command silently, displaying only the command's own output.
-- `--dry-run`: Outputs the generated command to the terminal without executing it.
+
+- `confirm` (default): show the generated command and ask before running it
+- `--yolo`: print `Running: ...` and execute immediately
+- `--quiet`: execute silently
+- `--dry-run`: print the generated command without executing it
 
 Examples:
 
@@ -98,121 +90,70 @@ aida --yolo -- list files
 aida --quiet -- show git status
 aida --dry-run -- find large files
 aida --profile api -- list the largest files in this repo
+aida --provider openai --api-key "$OPENAI_API_KEY" --model gpt-4o-mini -- list merged branches
 ```
+
+Useful flags:
+
+- `--profile`: select a named profile from config
+- `--provider`: override `aida.provider` for one invocation
+- `--model`: override the selected provider model for one invocation
+- `--api-key`: override the API key for `openai` or `aistudio` for one invocation
+- `--shell`: override the shell used to execute the generated command
 
 ## Config
 
-Config lives at:
-- `~/.config/aida/config.yaml`
+Config lives at `~/.config/aida/config.yaml`.
 
-Canonical reference shape:
+`aida init` is the normal starting point:
+
+```bash
+aida init
 ```
+
+To rewrite an existing config:
+
+```bash
+aida init --force
+```
+
+By default, `aida init` writes only detected ACP providers into the live `runtime.providers` section. The generated file also includes a commented reference block for ACP, pool, and API-backed provider shapes that you can copy from when editing the config manually.
+
+Minimal API-backed example:
+
+```yaml
 runtime:
   providers:
-    codex:
-      type: codex_acp
-      codex_acp:
-        model: gpt-5.3-codex
-    opencode:
-      type: opencode_acp
-      opencode_acp:
-        model: opencode/big-pickle
-        mode: plan
-    copilot:
-      type: copilot_acp
-      copilot_acp:
-        model: gpt-5-codex
-    gemini:
-      type: gemini_acp
-      gemini_acp:
-        model: gemini-3-flash-preview
-        mode: plan
-    claude_code:
-      type: claude_code_acp
-      claude_code_acp:
-        model: claude-sonnet-4
-    custom:
-      type: generic_acp
-      generic_acp:
-        cmd: [custom-acp, --stdio]
-        extra_args: []
-        model: custom-model
-        mode: ""
     openai:
       type: openai
       openai:
         api_key: ""
         model: gpt-4o-mini
-    aistudio:
-      type: aistudio
-      aistudio:
-        api_key: ""
-        model: gemini-2.5-flash
-    pool:
-      type: pool
-      pool:
-        members: [codex, openai]
-  mcp_servers: {}
 aida:
-  provider: codex
+  provider: openai
   mode: confirm
   shell: /bin/sh
+```
+
+Profile example:
+
+```yaml
 profiles:
-  default:
-    aida:
-      provider: codex
-  api:
+  work:
     aida:
       provider: openai
-      mode: confirm
-      shell: /bin/sh
 ```
 
-By default, `aida init` writes only detected ACP providers into the live `runtime.providers` section. The `openai`, `aistudio`, `pool`, and example profile entries above are kept in the commented reference block for manual use.
+Environment values can also override the YAML file. The most useful ones are:
 
-### Default Models
+- `AIDA_PROFILE`
+- `AIDA_PROVIDER`
+- `AIDA_MODE`
+- `AIDA_SHELL`
 
-- `codex`: `gpt-5.3-codex`
-- `opencode`: `opencode/big-pickle`
-- `copilot`: `gpt-5-codex`
-- `gemini`: `gemini-3-flash-preview`
-- `claude_code`: `claude-sonnet-4`
-- `openai`: `gpt-4o-mini`
-- `aistudio`: `gemini-2.5-flash`
+## Contributing
 
-### Environment Variables
-
-Environment values override the YAML file:
-
-- `AIDA_PROFILE`: Selects a profile before command execution.
-- `AIDA_PROVIDER`: Overrides `aida.provider`.
-- `AIDA_MODE`: Execution mode (`confirm`, `yolo`, `quiet`, `dry-run`).
-- `AIDA_SHELL`: Shell executable for running commands.
-- Any existing `aida.*` or `runtime.*` leaf can also be overridden by uppercasing the path and replacing dots with underscores.
-- Example: `AIDA_RUNTIME_PROVIDERS_OPENAI_OPENAI_API_KEY`
-- Example: `AIDA_RUNTIME_PROVIDERS_AISTUDIO_AISTUDIO_MODEL`
-
-## Development
-
-```bash
-task build
-task test
-task test:integration
-task test:integration:opencode
-task test:integration:gemini
-task lint
-task omnidist:build
-task omnidist:stage
-task omnidist:verify
-```
-
-`task test:integration` runs the Codex ACP integration test behind `integration && codex`. `task test:integration:opencode` runs OpenCode behind `integration && opencode`. `task test:integration:gemini` runs Gemini behind `integration && gemini`. These are intentionally separate from `go test ./...` because they depend on local CLI/auth state.
-
-## Release
-
-Tag pushes continue to build GitHub release binaries through `.github/workflows/release.yml`.
-
-NPM publishing is handled separately through `.github/workflows/omnidist-release.yml`, which builds and verifies the Omnidist package and then publishes `@metalagman/aida`. Maintainers need `NPM_PUBLISH_TOKEN` configured in GitHub Actions secrets.
+Source builds, tests, linting, integration test tags, and release workflow notes live in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 
