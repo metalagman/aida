@@ -18,14 +18,12 @@ import (
 )
 
 type cliOptions struct {
-	provider string
-	profile  string
-	apiKey   string
-	model    string
-	yolo     bool
-	quiet    bool
-	dryRun   bool
-	shell    string
+	profile string
+	model   string
+	yolo    bool
+	quiet   bool
+	dryRun  bool
+	shell   string
 }
 
 var rootCmd = NewRootCmd()
@@ -127,9 +125,7 @@ func setupRunner(cmd *cobra.Command, opts *cliOptions, cfg *config.Config) runne
 }
 
 func setupFlags(cmd *cobra.Command, opts *cliOptions) {
-	cmd.Flags().StringVar(&opts.provider, "provider", "", "provider ID from runtime.providers")
 	cmd.Flags().StringVar(&opts.profile, "profile", "", "config profile name")
-	cmd.Flags().StringVar(&opts.apiKey, "api-key", "", "LLM API key")
 	cmd.Flags().StringVar(&opts.model, "model", "", "LLM model name")
 	cmd.Flags().StringVar(&opts.shell, "shell", "", "Shell executable for running commands")
 	cmd.Flags().BoolVar(&opts.yolo, "yolo", false, "Run without confirmation")
@@ -171,12 +167,6 @@ func applyOverrides(cfg *config.Config, opts *cliOptions) error {
 		return nil
 	}
 
-	if opts.provider != "" {
-		if err := cfg.SetProvider(opts.provider); err != nil {
-			return err
-		}
-	}
-
 	if opts.shell != "" {
 		cfg.SetShell(opts.shell)
 	}
@@ -196,20 +186,6 @@ func promptInput(r io.Reader) io.ReadCloser {
 	return io.NopCloser(r)
 }
 
-func resolveProviderName(cfg *config.Config, opts *cliOptions) string {
-	if opts.provider != "" {
-		return opts.provider
-	}
-
-	if opts.apiKey == "" && opts.model == "" {
-		return ""
-	}
-
-	id, _ := cfg.ActiveProviderID()
-
-	return id
-}
-
 func resolveProfile(flagValue string) string {
 	if strings.TrimSpace(flagValue) != "" {
 		return strings.TrimSpace(flagValue)
@@ -219,20 +195,16 @@ func resolveProfile(flagValue string) string {
 }
 
 func applyProviderRuntimeOverrides(cfg *config.Config, opts *cliOptions) error {
-	providerName := resolveProviderName(cfg, opts)
-	if providerName == "" {
+	if opts == nil || strings.TrimSpace(opts.model) == "" {
 		return nil
 	}
 
-	if err := applyProviderModelOverride(cfg, providerName, opts.model); err != nil {
+	providerName, err := cfg.ActiveProviderID()
+	if err != nil {
 		return err
 	}
 
-	if err := applyProviderAPIKeyOverride(cfg, providerName, opts.apiKey); err != nil {
-		return err
-	}
-
-	return nil
+	return applyProviderModelOverride(cfg, providerName, opts.model)
 }
 
 func applyProviderModelOverride(cfg *config.Config, providerName, model string) error {
@@ -241,12 +213,4 @@ func applyProviderModelOverride(cfg *config.Config, providerName, model string) 
 	}
 
 	return cfg.SetProviderModel(providerName, model)
-}
-
-func applyProviderAPIKeyOverride(cfg *config.Config, providerName, apiKey string) error {
-	if apiKey == "" {
-		return nil
-	}
-
-	return cfg.SetProviderAPIKey(providerName, apiKey)
 }

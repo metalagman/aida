@@ -12,8 +12,8 @@
 - Bootstrap command: `aida init` generates a live ACP-only config from detected ACP providers plus a full commented canonical reference block.
 - Provider management: do not add `aida providers` commands; config is managed by `aida init` and direct YAML edits.
 - Profile selection: support `--profile` and `AIDA_PROFILE`.
-- Runtime selection: support `--provider` as a one-shot provider ID override.
-- Runtime overrides: support `--model` and `--api-key` as per-invocation overrides.
+- Runtime selection: use `aida.provider` in config and `profiles.*.aida.provider`; do not support `--provider` or `AIDA_PROVIDER`.
+- Runtime overrides: support `--model` as a per-invocation override; configure API keys in YAML, including env expansion such as `${OPENAI_API_KEY}`.
 - Tech stack: Go + Google ADK (google.golang.org/adk + google.golang.org/genai).
 - CLI/config libs: use Cobra + Viper.
 - Linting: `golangci-lint` v2.8.0+ is required.

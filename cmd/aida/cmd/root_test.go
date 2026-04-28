@@ -2,7 +2,6 @@ package cmd_test
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 
@@ -43,23 +42,6 @@ func TestPromptFromArgs(t *testing.T) {
 				t.Fatalf("PromptFromArgs(%v, %d) = %q, want %q", tc.args, tc.dashIndex, got, tc.want)
 			}
 		})
-	}
-}
-
-func TestRootCmdRejectsUnknownProvider(t *testing.T) {
-	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-
-	t.Cleanup(func() {
-		os.Setenv("HOME", origHome)
-	})
-	os.Setenv("HOME", tmpDir)
-
-	root := cmd.NewRootCmd()
-	root.SetArgs([]string{"--provider", "unknown", "--", "list"})
-
-	if err := root.Execute(); err == nil {
-		t.Fatal("expected error for unsupported provider")
 	}
 }
 
@@ -112,6 +94,28 @@ func TestRootCmdShowsHelpWithoutPrompt(t *testing.T) {
 
 		if !strings.Contains(stdout.String(), "Generate and run a single shell command from a prompt") {
 			t.Fatalf("help output = %q, want root help", stdout.String())
+		}
+	})
+}
+
+func TestRootCmdRejectsRemovedFlags(t *testing.T) {
+	t.Run("provider", func(t *testing.T) {
+		root := cmd.NewRootCmd()
+		root.SetArgs([]string{"--provider", "openai", "--", "list"})
+
+		err := root.Execute()
+		if err == nil || !strings.Contains(err.Error(), "unknown flag: --provider") {
+			t.Fatalf("Execute() error = %v, want unknown provider flag", err)
+		}
+	})
+
+	t.Run("api-key", func(t *testing.T) {
+		root := cmd.NewRootCmd()
+		root.SetArgs([]string{"--api-key", "test-key", "--", "list"})
+
+		err := root.Execute()
+		if err == nil || !strings.Contains(err.Error(), "unknown flag: --api-key") {
+			t.Fatalf("Execute() error = %v, want unknown api-key flag", err)
 		}
 	})
 }

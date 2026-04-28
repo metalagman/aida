@@ -115,22 +115,24 @@ func TestConfigRuntimeOverrides(t *testing.T) {
 		t.Fatalf("SetProviderModel() error = %v", err)
 	}
 
-	if err := cfg.SetProviderAPIKey("openai", "test-key"); err != nil {
-		t.Fatalf("SetProviderAPIKey() error = %v", err)
-	}
-
 	provider := cfg.Runtime.Providers["openai"]
 	if provider.OpenAI.Model != "gpt-5" {
 		t.Fatalf("provider.OpenAI.Model = %q, want %q", provider.OpenAI.Model, "gpt-5")
 	}
+}
 
-	if provider.OpenAI.APIKey != "test-key" {
-		t.Fatalf("provider.OpenAI.APIKey = %q, want %q", provider.OpenAI.APIKey, "test-key")
+func TestLoadProfileRejectsAIDAProviderEnvOverride(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv(config.EnvAIDAProvider, "openai")
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("config.Load() error = nil, want unsupported env override error")
 	}
 
-	err := cfg.SetProviderAPIKey("codex", "bad")
-	if err == nil || err.Error() != "--api-key is only supported for openai and aistudio providers" {
-		t.Fatalf("SetProviderAPIKey(codex) error = %v", err)
+	want := "AIDA_PROVIDER is not supported; use AIDA_PROFILE or config profiles instead"
+	if err.Error() != want {
+		t.Fatalf("config.Load() error = %q, want %q", err.Error(), want)
 	}
 }
 

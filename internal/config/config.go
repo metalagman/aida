@@ -17,6 +17,7 @@ const (
 
 	ProviderAIStudio = "aistudio"
 	ProviderOpenAI   = "openai"
+	EnvAIDAProvider  = "AIDA_PROVIDER"
 
 	defaultProfileName = "default"
 )
@@ -72,6 +73,10 @@ func LoadProfile(profile string) (*Config, error) {
 }
 
 func loadProfile(requestedProfile string) (*Config, error) {
+	if err := validateUnsupportedEnvOverrides(); err != nil {
+		return nil, err
+	}
+
 	path, err := ResolveConfigPath()
 	if err != nil {
 		return nil, err
@@ -264,6 +269,14 @@ func malformedProviderKey(provider map[string]any) (string, bool) {
 	return "", false
 }
 
+func validateUnsupportedEnvOverrides() error {
+	if value, ok := os.LookupEnv(EnvAIDAProvider); ok && strings.TrimSpace(value) != "" {
+		return fmt.Errorf("%s is not supported; use AIDA_PROFILE or config profiles instead", EnvAIDAProvider)
+	}
+
+	return nil
+}
+
 func (c *Config) ActiveProviderID() (string, error) {
 	if c == nil {
 		return "", fmt.Errorf("config is nil")
@@ -310,25 +323,6 @@ func (c *Config) ValidateSelectedRuntime() error {
 	}
 
 	return c.validateProviderScope(providerID, state, false)
-}
-
-func (c *Config) SetProvider(id string) error {
-	if c == nil {
-		return fmt.Errorf("config is nil")
-	}
-
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return fmt.Errorf("provider id is required")
-	}
-
-	if _, ok := c.Runtime.Providers[id]; !ok {
-		return fmt.Errorf("provider %q is not defined in runtime.providers", id)
-	}
-
-	c.Aida.Provider = id
-
-	return nil
 }
 
 func (c *Config) SetShell(shell string) {
@@ -439,43 +433,6 @@ func acpProviderModelBlock(provider *agentconfig.Config) (string, *agentconfig.A
 	default:
 		return "", nil, false
 	}
-}
-
-func (c *Config) SetProviderAPIKey(id, apiKey string) error {
-	if c == nil {
-		return fmt.Errorf("config is nil")
-	}
-
-	apiKey = strings.TrimSpace(apiKey)
-	if apiKey == "" {
-		return nil
-	}
-
-	provider, ok := c.Runtime.Providers[id]
-	if !ok {
-		return fmt.Errorf("provider %q is not defined in runtime.providers", id)
-	}
-
-	switch provider.Type {
-	case agentconfig.AgentTypeOpenAI:
-		if provider.OpenAI == nil {
-			provider.OpenAI = &agentconfig.LocalAPIConfig{}
-		}
-
-		provider.OpenAI.APIKey = apiKey
-	case agentconfig.AgentTypeAIStudio:
-		if provider.AIStudio == nil {
-			provider.AIStudio = &agentconfig.LocalAPIConfig{}
-		}
-
-		provider.AIStudio.APIKey = apiKey
-	default:
-		return fmt.Errorf("--api-key is only supported for openai and aistudio providers")
-	}
-
-	c.Runtime.Providers[id] = provider
-
-	return nil
 }
 
 type runtimeValidationState struct {

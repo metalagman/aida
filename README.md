@@ -22,9 +22,11 @@ aida -- list the largest files in this repo
 
 `aida init` writes `~/.config/aida/config.yaml` with detected ACP providers in the live config and a full commented reference block for ACP, pool, and API-backed provider shapes.
 
+If `aida init` does not detect a supported ACP runtime in `PATH`, edit `~/.config/aida/config.yaml` before your first command and choose a provider through `aida.provider` or a profile.
+
 ## Runtime Options
 
-ACP-compatible CLIs are the preferred runtime path. If one of the supported ACP clients is already installed and available in `PATH`, `aida init` will detect it and write a working provider entry for you.
+ACP-compatible CLIs are the preferred runtime path. If `codex`, `opencode`, `gemini`, `copilot`, `claudecode`, or `claude` is already available in `PATH`, `aida init` will detect it and write a working provider entry for you.
 
 If you want to use an API-backed provider instead, edit `~/.config/aida/config.yaml` after `aida init` and configure one of these provider types:
 
@@ -89,16 +91,14 @@ Examples:
 aida --yolo -- list files
 aida --quiet -- show git status
 aida --dry-run -- find large files
-aida --profile api -- list the largest files in this repo
-aida --provider openai --api-key "$OPENAI_API_KEY" --model gpt-4o-mini -- list merged branches
+aida --profile work -- list the largest files in this repo
+aida --profile work --model gpt-4o-mini -- list merged branches
 ```
 
 Useful flags:
 
 - `--profile`: select a named profile from config
-- `--provider`: override `aida.provider` for one invocation
 - `--model`: override the selected provider model for one invocation
-- `--api-key`: override the API key for `openai` or `aistudio` for one invocation
 - `--shell`: override the shell used to execute the generated command
 
 ## Config
@@ -117,7 +117,24 @@ To rewrite an existing config:
 aida init --force
 ```
 
+The config format is relay-style YAML with top-level `runtime`, `aida`, and `profiles`.
+
 By default, `aida init` writes only detected ACP providers into the live `runtime.providers` section. The generated file also includes a commented reference block for ACP, pool, and API-backed provider shapes that you can copy from when editing the config manually.
+
+Minimal ACP example:
+
+```yaml
+runtime:
+  providers:
+    codex:
+      type: codex_acp
+      codex_acp:
+        model: gpt-5.3-codex
+aida:
+  provider: codex
+  mode: confirm
+  shell: /bin/sh
+```
 
 Minimal API-backed example:
 
@@ -127,13 +144,15 @@ runtime:
     openai:
       type: openai
       openai:
-        api_key: ""
+        api_key: ${OPENAI_API_KEY}
         model: gpt-4o-mini
 aida:
   provider: openai
   mode: confirm
   shell: /bin/sh
 ```
+
+You can also put a literal API key in YAML, but environment expansion is the better default for local secrets.
 
 Profile example:
 
@@ -147,7 +166,6 @@ profiles:
 Environment values can also override the YAML file. The most useful ones are:
 
 - `AIDA_PROFILE`
-- `AIDA_PROVIDER`
 - `AIDA_MODE`
 - `AIDA_SHELL`
 
