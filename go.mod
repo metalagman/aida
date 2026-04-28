@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/joho/godotenv v1.5.1
-	github.com/normahq/runtime v0.0.0-20260427171805-4504fc8544d1
+	github.com/normahq/runtime v0.0.1
 	github.com/spf13/cobra v1.10.2
 	google.golang.org/adk v1.2.0
 	google.golang.org/genai v1.54.0

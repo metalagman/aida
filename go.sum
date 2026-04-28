@@ -70,8 +70,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/modelcontextprotocol/go-sdk v1.5.0 h1:CHU0FIX9kpueNkxuYtfYQn1Z0slhFzBZuq+x6IiblIU=
 github.com/modelcontextprotocol/go-sdk v1.5.0/go.mod h1:gggDIhoemhWs3BGkGwd1umzEXCEMMvAnhTrnbXJKKKA=
-github.com/normahq/runtime v0.0.0-20260427171805-4504fc8544d1 h1:33ivXGpdWLwORqtH/EjPOEzZFE8AgwUzbv/b0rH+yqs=
-github.com/normahq/runtime v0.0.0-20260427171805-4504fc8544d1/go.mod h1:PZ8AWnHANmtI6BRb6m1CFlVMcBJJm2lJUTMoT+waDcg=
+github.com/normahq/runtime v0.0.1 h1:PPxfrtvEodHA5KOMPJeYAfL7Fmkv7AwH5Kgve13OK2k=
+github.com/normahq/runtime v0.0.1/go.mod h1:PZ8AWnHANmtI6BRb6m1CFlVMcBJJm2lJUTMoT+waDcg=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
 github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
