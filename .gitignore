@@ -17,6 +17,7 @@ bin/
 
 .idea/
 .vscode/
+.codex
 .task/
 .env
 .gocache/

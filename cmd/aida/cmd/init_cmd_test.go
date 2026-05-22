@@ -156,6 +156,45 @@ func TestInitGeneratedProviderProfilesRoundTrip(t *testing.T) {
 	}
 }
 
+func TestInitDetectsClaudeCodeFromClaudeBinary(t *testing.T) {
+	runInitWithDetectedProviders(t, "claude")
+
+	cfg, err := config.LoadProfile("claude_code")
+	if err != nil {
+		t.Fatalf("config.LoadProfile(%q) error = %v", "claude_code", err)
+	}
+
+	if cfg.Aida.Provider != "claude_code" {
+		t.Fatalf("cfg.Aida.Provider = %q, want %q", cfg.Aida.Provider, "claude_code")
+	}
+
+	provider, ok := cfg.Runtime.Providers["claude_code"]
+	if !ok {
+		t.Fatalf("cfg.Runtime.Providers missing claude_code: %#v", cfg.Runtime.Providers)
+	}
+
+	if provider.ClaudeCodeACP == nil {
+		t.Fatalf("provider.ClaudeCodeACP is nil")
+	}
+
+	if got := provider.ClaudeCodeACP.Model; got != "claude-sonnet-4" {
+		t.Fatalf("provider.ClaudeCodeACP.Model = %q, want %q", got, "claude-sonnet-4")
+	}
+
+	if err := cfg.ValidateSelectedRuntime(); err != nil {
+		t.Fatalf("cfg.ValidateSelectedRuntime() error = %v", err)
+	}
+}
+
+func TestInitDoesNotDetectClaudeCodeFromClaudeCodeBinary(t *testing.T) {
+	path := runInitWithDetectedProviders(t, "claudecode")
+	liveConfig := readLiveInitConfig(t, path)
+
+	assertContainsNone(t, liveConfig, []string{
+		"\n    claude_code:",
+	})
+}
+
 func TestInitGeneratedConfigRoundTrips(t *testing.T) {
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)

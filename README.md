@@ -24,7 +24,7 @@ If `aida init` does not detect a supported ACP runtime in `PATH`, edit `~/.confi
 
 ## Runtime Options
 
-ACP-compatible CLIs are the preferred runtime path. If `codex`, `opencode`, `gemini`, `copilot`, `claudecode`, or `claude` is already available in `PATH`, `aida init` will detect it and write a working provider entry and profile for you.
+ACP-compatible CLIs are the preferred runtime path. If `codex`, `opencode`, `gemini`, `copilot`, or `claude` is already available in `PATH`, `aida init` will detect it and write a working provider entry and profile for you.
 
 If you want to use an API-backed provider instead, edit `~/.config/aida/config.yaml` after `aida init` and configure one of these provider types:
 

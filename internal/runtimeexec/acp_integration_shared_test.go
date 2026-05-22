@@ -13,8 +13,8 @@ import (
 
 	"github.com/metalagman/aida/internal/config"
 	"github.com/metalagman/aida/internal/runtimeexec"
-	"github.com/normahq/runtime/agentconfig"
-	runtimeconfig "github.com/normahq/runtime/appconfig"
+	"github.com/normahq/norma/pkg/runtime/agentconfig"
+	runtimeconfig "github.com/normahq/norma/pkg/runtime/appconfig"
 )
 
 const (

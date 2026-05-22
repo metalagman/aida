@@ -10,8 +10,8 @@ import (
 
 	"github.com/metalagman/aida/internal/config"
 	"github.com/metalagman/aida/internal/runtimeexec"
-	"github.com/normahq/runtime/agentconfig"
-	runtimeconfig "github.com/normahq/runtime/appconfig"
+	"github.com/normahq/norma/pkg/runtime/agentconfig"
+	runtimeconfig "github.com/normahq/norma/pkg/runtime/appconfig"
 	adkagent "google.golang.org/adk/agent"
 	"google.golang.org/adk/model"
 	"google.golang.org/adk/session"

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/metalagman/aida/internal/config"
-	"github.com/normahq/runtime/agentconfig"
+	"github.com/normahq/norma/pkg/runtime/agentconfig"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -206,7 +206,7 @@ func detectACPProviders() []detectedProvider {
 			ID:       "claude_code",
 			Type:     agentconfig.AgentTypeClaudeCodeACP,
 			Model:    "claude-sonnet-4",
-			Binaries: []string{"claudecode", "claude"},
+			Binaries: []string{"claude"},
 		},
 	}
 

@@ -5,7 +5,7 @@ package runtimeexec_test
 import (
 	"testing"
 
-	"github.com/normahq/runtime/agentconfig"
+	"github.com/normahq/norma/pkg/runtime/agentconfig"
 )
 
 func TestACPIntegration_Codex_CountGoFiles(t *testing.T) {

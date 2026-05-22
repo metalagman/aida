@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/metalagman/aida/internal/config"
-	"github.com/normahq/runtime/agentfactory"
-	"github.com/normahq/runtime/mcpregistry"
+	"github.com/normahq/norma/pkg/runtime/agentfactory"
+	"github.com/normahq/norma/pkg/runtime/mcpregistry"
 	adkagent "google.golang.org/adk/agent"
 	adkrunner "google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
